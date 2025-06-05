@@ -1,0 +1,678 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Metadata:
+  Generator: "former2 helped a bit"
+Description: "Stack for RAA - ECOMM - Security layer. Step:1"
+Parameters:
+  Environment:
+    Type: "String"
+    Default: "dev"
+    Description: By selecting the prefix i.e. "dev", you will create new stack for RAA.
+    AllowedValues:
+      - "dev"
+  ProductName:
+    Type: "String"
+    Default: "RANDA-ECOMM"
+    Description: This is reserved for Product Name. No need to change it.
+    AllowedValues:
+      - "RANDA-ECOMM"
+ 
+Resources:
+ 
+
+  EncryptionKeyForS3Buckets:
+      Type: "AWS::KMS::Key"
+      Properties:
+        Enabled: true
+        EnableKeyRotation: true
+        PendingWindowInDays: 20
+        Description: "used mainly for securing documents, images, video files, etc."
+        KeyUsage: "ENCRYPT_DECRYPT"
+        KeyPolicy: !Sub |
+            {
+              "Version" : "2012-10-17",
+              "Id" : "key-consolepolicy-3",
+              "Statement" : [ {
+                "Sid" : "Enable IAM User Permissions",
+                "Effect" : "Allow",
+                "Principal" : {
+                  "AWS" : "arn:aws:iam::${AWS::AccountId}:root"
+                },
+                "Action" : "kms:*",
+                "Resource" : "*"
+              }, {
+                "Sid" : "Allow access for Key Administrators",
+                "Effect" : "Allow",
+                "Principal" : {
+                  "AWS" : [ "arn:aws:iam::${AWS::AccountId}:user/prod-deploy", "arn:aws:iam::${AWS::AccountId}:user/dev-deploy" ]
+                },
+                "Action" : [ "kms:Create*", "kms:Describe*", "kms:Enable*", "kms:List*", "kms:Put*", "kms:Update*", "kms:Revoke*", "kms:Disable*", "kms:Get*", "kms:Delete*", "kms:TagResource", "kms:UntagResource", "kms:ScheduleKeyDeletion", "kms:CancelKeyDeletion" ],
+                "Resource" : "*"
+              }, {
+                "Sid" : "Allow use of the key",
+                "Effect" : "Allow",
+                "Principal" : {
+                  "AWS" : [ "arn:aws:iam::${AWS::AccountId}:user/prod-deploy", "arn:aws:iam::${AWS::AccountId}:user/dev-deploy" ]
+                },
+                "Action" : [ "kms:Encrypt", "kms:Decrypt", "kms:ReEncrypt*", "kms:GenerateDataKey*", "kms:DescribeKey" ],
+                "Resource" : "*"
+              }, {
+                "Sid" : "Allow attachment of persistent resources",
+                "Effect" : "Allow",
+                "Principal" : {
+                  "AWS" : [ "arn:aws:iam::${AWS::AccountId}:user/prod-deploy", "arn:aws:iam::${AWS::AccountId}:user/dev-deploy" ]
+                },
+                "Action" : [ "kms:CreateGrant", "kms:ListGrants", "kms:RevokeGrant" ],
+                "Resource" : "*",
+                "Condition" : {
+                  "Bool" : {
+                    "kms:GrantIsForAWSResource" : "true"
+                  }
+                }
+              },
+              {
+              "Sid": "Allow use of the key for CloudWatch Logs",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "logs.${AWS::Region}.amazonaws.com"
+              },
+              "Action": [
+                "kms:Encrypt*",
+                "kms:Decrypt*",
+                "kms:ReEncrypt*",
+                "kms:GenerateDataKey*",
+                "kms:Describe*"
+              ],
+              "Resource": "*"
+            } ]
+            }
+
+
+  Alias:
+    Type: "AWS::KMS::Alias"
+    Properties:
+      AliasName: !Join ['',['alias/',!Ref Environment,"-randa-secure-kms-key"]]
+      TargetKeyId: !Ref EncryptionKeyForS3Buckets
+
+  EncryptionKeyForDB:
+      Type: "AWS::KMS::Key"
+      Properties:
+        Enabled: true
+        EnableKeyRotation: true
+        PendingWindowInDays: 20
+        Description: "used for db cluster only"
+        KeyUsage: "ENCRYPT_DECRYPT"
+        KeyPolicy: !Sub |
+            {
+              "Version" : "2012-10-17",
+              "Id" : "key-consolepolicy-3",
+              "Statement" : [ {
+                "Sid" : "Enable IAM User Permissions",
+                "Effect" : "Allow",
+                "Principal" : {
+                  "AWS" : "arn:aws:iam::${AWS::AccountId}:root"
+                },
+                "Action" : "kms:*",
+                "Resource" : "*"
+              }, {
+                "Sid" : "Allow access for Key Administrators",
+                "Effect" : "Allow",
+                "Principal" : {
+                  "AWS" : [ "arn:aws:iam::${AWS::AccountId}:user/prod-deploy", "arn:aws:iam::${AWS::AccountId}:user/dev-deploy" ]
+                },
+                "Action" : [ "kms:Create*", "kms:Describe*", "kms:Enable*", "kms:List*", "kms:Put*", "kms:Update*", "kms:Revoke*", "kms:Disable*", "kms:Get*", "kms:Delete*", "kms:TagResource", "kms:UntagResource", "kms:ScheduleKeyDeletion", "kms:CancelKeyDeletion" ],
+                "Resource" : "*"
+              }, {
+                "Sid" : "Allow use of the key",
+                "Effect" : "Allow",
+                "Principal" : {
+                  "AWS" : [ "arn:aws:iam::${AWS::AccountId}:user/prod-deploy", "arn:aws:iam::${AWS::AccountId}:user/dev-deploy" ]
+                },
+                "Action" : [ "kms:Encrypt", "kms:Decrypt", "kms:ReEncrypt*", "kms:GenerateDataKey*", "kms:DescribeKey" ],
+                "Resource" : "*"
+              }, {
+                "Sid" : "Allow attachment of persistent resources",
+                "Effect" : "Allow",
+                "Principal" : {
+                  "AWS" : [ "arn:aws:iam::${AWS::AccountId}:user/prod-deploy", "arn:aws:iam::${AWS::AccountId}:user/dev-deploy" ]
+                },
+                "Action" : [ "kms:CreateGrant", "kms:ListGrants", "kms:RevokeGrant" ],
+                "Resource" : "*",
+                "Condition" : {
+                  "Bool" : {
+                    "kms:GrantIsForAWSResource" : "true"
+                  }
+                }
+              } ]
+            }
+
+  AliasDB:
+    Type: "AWS::KMS::Alias"
+    Properties:
+      AliasName: !Join ['',['alias/',!Ref Environment,"-randa-db-secure-kms-key"]]
+      TargetKeyId: !Ref EncryptionKeyForDB
+
+
+
+  # Create a secret with the username admin and a randomly generated password in JSON.  
+  RandaDBClusterDBPassword:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub 
+            'RandaDBClusterDBPassword-${Environment}'
+      Description: 'Secret for DB Cluster'
+      GenerateSecretString:
+        SecretStringTemplate:  !Sub 
+                                  '{"username":"${Environment}dbadminmain"}'
+        GenerateStringKey: 'password'
+        PasswordLength: 20
+        ExcludeCharacters: '"@/\'
+        IncludeSpace: false
+        ExcludeUppercase: false
+        ExcludePunctuation: false
+        ExcludeNumbers: false
+        ExcludeLowercase: false
+      Tags: 
+      - 
+        Key: "Environment"
+        Value: !Ref Environment
+      - 
+        Key: "Product"
+        Value: !Ref ProductName
+      - 
+        Key: "Purpose"
+        Value: "store db cluster password"
+
+
+
+  RandaDeveloperRedshiftRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ['', [!Ref "Environment", "-raa-dev-redshiftrole" ]]
+      Description: "this role is for redshift development required access"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+              - redshift.amazonaws.com
+              - events.amazonaws.com
+              - scheduler.redshift.amazonaws.com
+            AWS:
+              - !GetAtt RedshiftRole.Arn
+              - { "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:root" }
+          Action:
+            - sts:AssumeRole
+      Path: "/"
+      ManagedPolicyArns:
+        - !Ref AWSGlueServiceRoleRAADWPolicy
+        - arn:aws:iam::aws:policy/service-role/AmazonDMSRedshiftS3Role
+        - arn:aws:iam::aws:policy/AmazonRedshiftAllCommandsFullAccess
+        - arn:aws:iam::aws:policy/AmazonRedshiftFullAccess
+
+
+  RedshiftRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ['', [!Ref "Environment", "-raa-redshiftrole" ]]
+      Description: "this role is for redshift required access"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+              - redshift.amazonaws.com
+              - events.amazonaws.com
+              - scheduler.redshift.amazonaws.com
+          Action:
+            - sts:AssumeRole
+      Path: "/"
+      ManagedPolicyArns:
+        - !Ref AWSGlueServiceRoleRAADWPolicy
+        - arn:aws:iam::aws:policy/service-role/AmazonDMSRedshiftS3Role
+        - arn:aws:iam::aws:policy/AmazonRedshiftAllCommandsFullAccess
+        - arn:aws:iam::aws:policy/AmazonRedshiftFullAccess
+
+  AWSGlueServiceRoleRAADWPolicy:
+    Type: "AWS::IAM::ManagedPolicy"
+    Properties:
+      ManagedPolicyName: !Join ['', [!Ref "Environment", "-raa-awsglueservicepolicy" ]]
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action:
+              - "s3:GetObject"
+              - "s3:GetBucketAcl"
+              - "s3:GetBucketPolicy"
+              - "s3:GetObjectVersion"
+              - "s3:GetObjectTagging"
+              - "s3:GetBucketCors"
+              - "s3:GetEncryptionConfiguration"
+              - "s3:GetBucketLocation"
+              - "s3:ListBucket"
+              - "s3:ListAllMyBuckets"
+              - "s3:ListMultipartUploadParts"
+              - "s3:ListBucketMultipartUploads"
+              - "s3:PutObject"
+              - "s3:PutBucketAcl"
+              - "s3:PutBucketCors"
+              - "s3:DeleteObject"
+              - "s3:AbortMultipartUpload"
+              - "s3:CreateBucket"
+            Effect: "Allow"
+            Resource: "arn:aws:s3:::*"
+          - Effect: "Allow"
+            Action:
+              - "glue:CreateDatabase"
+              - "glue:CreateTable"
+              - "glue:GetTable"
+              - "glue:DeleteTable"
+            Resource: { "Fn::Sub": "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/*" }
+          - Effect: "Allow"
+            Action: "sts:AssumeRole"
+            Resource: { "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:role/${Environment}-raa-redshiftrole" }
+          - Effect: "Allow"
+            Action:
+              - "glue:CreateTable"
+              - "glue:GetTable"
+              - "glue:DeleteTable"
+            Resource: { "Fn::Sub": "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/*" }
+          - Effect: "Allow"
+            Action:
+              - "sns:Publish"
+              - "sns:Subscribe"
+              # Add more SNS actions if needed, e.g.:
+              # - "sns:CreateTopic"
+              # - "sns:DeleteTopic"
+              # - "sns:Unsubscribe"
+            Resource: "*"
+          - Effect: "Allow"
+            Action:
+              - "events:ListRules"
+            Resource: "*"
+          - Effect: "Allow"
+            Action:
+              - "sqlworkbench:*"
+            Resource: "*"
+
+  AWSRAADBAPolicy: 
+    Type: "AWS::IAM::ManagedPolicy"
+    Properties:
+      ManagedPolicyName: !Join ['', [!Ref "Environment", "-raa-dbapolicy" ]]
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action:
+              - "s3:GetObject"
+              - "s3:GetBucketAcl"
+              - "s3:GetBucketPolicy"
+              - "s3:GetObjectVersion"
+              - "s3:GetObjectTagging"
+              - "s3:GetBucketCors"
+              - "s3:GetEncryptionConfiguration"
+              - "s3:GetBucketLocation"
+              - "s3:ListBucket"
+              - "s3:ListAllMyBuckets"
+              - "s3:ListMultipartUploadParts"
+              - "s3:ListBucketMultipartUploads"
+              - "s3:PutObject"
+              - "s3:PutBucketAcl"
+              - "s3:PutBucketCors"
+              - "s3:DeleteObject"
+              - "s3:AbortMultipartUpload"
+              - "s3:CreateBucket"
+            Effect: "Allow"
+            Resource: "arn:aws:s3:::*"
+          - Effect: "Allow"
+            Action:
+              - "glue:CreateDatabase"
+              - "glue:CreateTable"
+              - "glue:GetTable"
+              - "glue:DeleteTable"
+            Resource: { "Fn::Sub": "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/*" }
+          - Effect: "Allow"
+            Action: "sts:AssumeRole"
+            Resource: { "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:role/${Environment}-raa-redshiftrole" }
+          - Effect: "Allow"
+            Action:
+              - "glue:CreateTable"
+              - "glue:GetTable"
+              - "glue:DeleteTable"
+            Resource: { "Fn::Sub": "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/*" }
+          - Effect: "Allow"
+            Action:
+              - "sns:Publish"
+              - "sns:Subscribe"
+              - "sns:CreateTopic"
+              #- "sns:DeleteTopic"
+              - "sns:Unsubscribe"
+            Resource: "*"
+          - Effect: "Allow"
+            Action:
+              - "events:ListRules"
+              - "events:DescribeRule"
+              - "events:ListTargetsByRule"
+            Resource: "*"
+          - Effect: "Allow"
+            Action:
+                - "secretsmanager:GetSecretValue"
+                - "secretsmanager:CreateSecret"
+                - "secretsmanager:DescribeSecret"
+                - "secretsmanager:UpdateSecret"
+                - "secretsmanager:ListSecrets"
+                - "secretsmanager:TagResource"
+            Resource: "*"
+          - Effect: "Allow"
+            Action:
+              - "redshift-data:*"
+              - "redshift-serverless:ListNamespaces"
+            Resource: "*"
+          - Action:
+            - "redshift:GetClusterCredentials"
+            - "redshift:DescribeCustomDomainAssociations"
+            - "redshift:*"
+            Effect: "Allow"
+            Resource: [
+              { "Fn::Sub": "arn:aws:redshift:${AWS::Region}:${AWS::AccountId}:cluster:*" },
+              { "Fn::Sub": "arn:aws:redshift:${AWS::Region}:${AWS::AccountId}:dbuser:*" },
+              { "Fn::Sub": "arn:aws:redshift:${AWS::Region}:${AWS::AccountId}:dbname:*" }
+            ] 
+          - Effect: "Allow"
+            Action:
+              - "redshift-serverless:ListRecoveryPoints"
+              - "redshift-serverless:ListSnapshots"
+              - "redshift-serverless:ListWorkgroups"
+            Resource: "*"  
+          - Effect: "Allow"
+            Action:
+              - "sqlworkbench:*"
+            Resource: "*"
+          - Effect: "Allow"
+            Action:
+              - "tag:GetResources"
+            Resource: "*"
+
+  AWSLambdaRAAPolicy:
+    Type: "AWS::IAM::ManagedPolicy"
+    Properties:
+      ManagedPolicyName: !Join ['', [!Ref "Environment", "-raa-awslambdaexecutepolicy" ]]
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action:
+              - "s3:*"
+            Effect: "Allow"
+            Resource: "arn:aws:s3:::*"
+          - Effect: "Allow"
+            Action:
+              - "glue:*"
+            Resource: { "Fn::Sub": "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/*" }
+          - Effect: "Allow"
+            Action:
+              - "redshift:*"
+            Resource: { "Fn::Sub": "arn:aws:redshift:${AWS::Region}:${AWS::AccountId}:cluster:*" }
+          - Effect: "Allow"
+            Action:
+              - "glue:*"
+            Resource: { "Fn::Sub": "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/*" }
+
+
+  RandaLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ['', [!Ref "Environment", "-raa-lambdaexecutionrole" ]]
+      Description: "this role is for lambda required access"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - !Ref AWSLambdaRAAPolicy
+      Policies:
+        - PolicyName: LambdaExecutionPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:*
+                Resource: '*'
+              # Add additional permissions here as needed for your specific Lambda function
+
+
+  AWSLoggingRAAPolicy:
+    Type: "AWS::IAM::ManagedPolicy"
+    Properties:
+      ManagedPolicyName: !Join ['', [!Ref "Environment", "-raa-loggingpolicy" ]]
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action:
+              - "logs:CreateLogGroup"
+              - "logs:CreateLogStream"
+              - "logs:PutLogEvents"
+              - "logs:DescribeLogStreams"
+              - "logs:DescribeLogGroups" 
+            Effect: "Allow"
+            Resource: "*"
+
+  AWSEc2FlowLogsRAARole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ['', [!Ref "Environment", "-raa-loggingrole" ]]
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+          - Effect: Allow
+            Principal:
+              Service: vpc-flow-logs.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref AWSLoggingRAAPolicy
+
+
+
+  AWSRedshiftThoughtSpotAccessPolicy:
+    Type: "AWS::IAM::ManagedPolicy"
+    Properties:
+      ManagedPolicyName: !Join ['', [!Ref "Environment", "-raa-aws-thoughtspot-access-policy" ]]
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+            - Action:
+              - "redshift:GetClusterCredentials"
+              - "redshift:DescribeCustomDomainAssociations"
+              - "redshift:*"
+              Effect: "Allow"
+              Resource: [
+                { "Fn::Sub": "arn:aws:redshift:${AWS::Region}:${AWS::AccountId}:cluster:*" },
+                { "Fn::Sub": "arn:aws:redshift:${AWS::Region}:${AWS::AccountId}:dbuser:*" },
+                { "Fn::Sub": "arn:aws:redshift:${AWS::Region}:${AWS::AccountId}:dbname:*" }
+              ]
+
+
+  AWSRedshiftThoughtSpotRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ['', [!Ref "Environment", "-raa-aws-thoughtspot-role" ]]
+      Description: "this role is for redshift development required access"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+              - redshift.amazonaws.com
+              - events.amazonaws.com
+              - scheduler.redshift.amazonaws.com
+            AWS:
+              - !GetAtt RedshiftRole.Arn
+              - { "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:root" }
+          Action:
+            - sts:AssumeRole
+      Path: "/"
+      ManagedPolicyArns:
+        - !Ref AWSRedshiftThoughtSpotAccessPolicy
+        - arn:aws:iam::aws:policy/service-role/AmazonDMSRedshiftS3Role
+        - arn:aws:iam::aws:policy/AmazonRedshiftFullAccess
+
+
+  RandaSSMAccessRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: !Join ['', [!Ref "Environment", "-raa-ssmaccess-role" ]]
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service: 
+                - ec2.amazonaws.com
+                - ssm.amazonaws.com
+            Action: "sts:AssumeRole"
+      Path: "/"
+      ManagedPolicyArns:
+        - !Ref RandaSSMAccessPolicy
+        - "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+        - "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+        - "arn:aws:iam::aws:policy/AmazonSSMFullAccess"
+        - "arn:aws:iam::aws:policy/AmazonSSMManagedEC2InstanceDefaultPolicy"
+
+  #required for setup of Session Manager being able to access SSM and EC2 instances without a need for private\ssh 
+  RandaSSMInstanceProfile:
+    Type: "AWS::IAM::InstanceProfile"
+    Properties:
+      InstanceProfileName: !Join ['', [!Ref "Environment", "-raa-instanceprofile" ]]
+      Path: "/"
+      Roles:
+        - !Ref RandaSSMAccessRole
+
+
+  RandaSSMAccessPolicy:
+    Type: "AWS::IAM::ManagedPolicy"
+    Properties:
+      ManagedPolicyName: !Join ['', [!Ref "Environment", "-raa-ssmaccesspolicy" ]]
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action:
+              - "logs:*"
+              - "kms:*"
+              - "ssm:*"
+              - "secretsmanager:GetSecretValue"
+              - "s3:*"
+              - "ec2messages:*"
+              - "ec2:*"
+              - "cloudwatch:*"
+              - "events:*"
+              - "sqs:*"
+              - "sns:*"
+              - "ecs:*"
+              - "sts:*"
+              - "autoscaling:*"
+              - "imagebuilder:GetComponent"
+              - "codepipeline:*"
+              - "elasticloadbalancing:*"
+              - "redshift:*"
+              - "redshift-data:*"
+            Effect: "Allow"
+            Resource: "*"
+
+
+
+#OUTPUT SECTION, MOSTLY USED FOR EXPORTING KEYS\IDS FOR REFERENCE PURPOSES IN NEW STACKS\LAYERS
+Outputs:
+  ExportEncryptionKeyForS3Buckets:
+    Description: The KMS Key used for secure S3 buckets
+    Value: !GetAtt EncryptionKeyForS3Buckets.Arn
+    Export:
+      Name:  !Join ['', [!Ref "Environment", "-ExportEncryptionKeyForS3Buckets" ]] 
+  ExportEncryptionKeyForDB:
+    Description: The KMS Key used by db cluster
+    Value: !GetAtt EncryptionKeyForDB.Arn
+    Export:
+      Name:  !Join ['', [!Ref "Environment", "-ExportEncryptionKeyForDB" ]] 
+  ExportRandaDBClusterDBPassword:
+    Description: ARN for DB Cluster Password
+    Value: !Ref RandaDBClusterDBPassword
+    Export:
+      Name:  !Join ['', [!Ref "Environment", "-RandaDBClusterDBPassword" ]] 
+  ExportAWSRedshiftThoughtSpotAccessPolicy:
+    Description: "ARN of the AWSRedshiftThoughtSpotAccessPolicy-RAA-DW policy"
+    Value: !Ref AWSRedshiftThoughtSpotAccessPolicy
+    Export:
+      Name:  !Join ['', [!Ref "Environment", "-AWSRedshiftThoughtSpotAccessPolicyArn" ]]
+  ExportAWSGlueServiceRoleRAADWPolicyArn:
+    Description: "ARN of the AWSGlueServiceRole-RAA-DW policy"
+    Value: !Ref AWSGlueServiceRoleRAADWPolicy
+    Export:
+      Name:  !Join ['', [!Ref "Environment", "-AWSGlueServiceRoleRAADWPolicyArn" ]]
+  ExportAWSRAADBAPolicy:
+    Description: "ARN of the AWSRAADBAPolicy policy"
+    Value: !Ref AWSRAADBAPolicy
+    Export:
+      Name:  !Join ['', [!Ref "Environment", "-AWSRAADBAPolicyArn" ]]
+  ExportAWSLambdaRAAPolicyArn:
+    Description: "ARN of the AWSLambdaRAAPolicy policy"
+    Value: !Ref AWSLambdaRAAPolicy
+    Export:
+      Name:  !Join ['', [!Ref "Environment", "-AWSLambdaRAAPolicyArn" ]]
+  ExportRandaLambdaExecutionRoleArn:
+    Description: "ARN of the RandaLambdaExecutionRole policy"
+    Value: !GetAtt RandaLambdaExecutionRole.Arn
+    Export:
+      Name:  !Join ['', [!Ref "Environment", "-RandaLambdaExecutionRoleArn" ]]
+  ExportRedshiftRole:
+    Description: "ARN of the RedshiftRole"
+    Value: !GetAtt RedshiftRole.Arn
+    Export:
+      Name:  !Join ['', [!Ref "Environment", "-RedshiftRoleArn" ]]
+  ExportRandaDeveloperRedshiftRole:
+    Description: "ARN of the RandaDeveloperRedshiftRole"
+    Value: !GetAtt RandaDeveloperRedshiftRole.Arn
+    Export:
+      Name:  !Join ['', [!Ref "Environment", "-RandaDeveloperRedshiftRoleArn" ]]
+  ExportRandaDeveloperRedshiftRoleName:
+    Description: "NAme of the RandaDeveloperRedshiftRole"
+    Value: !Ref RandaDeveloperRedshiftRole
+    Export:
+      Name:  !Join ['', [!Ref "Environment", "-RandaDeveloperRedshiftRoleName" ]]
+  ExportAWSLoggingRAAPolicy:
+    Description: "ARN of the AWSLoggingRAAPolicy"
+    Value: !Ref AWSLoggingRAAPolicy
+    Export:
+      Name:  !Join ['', [!Ref "Environment", "-AWSLoggingRAAPolicyArn" ]]
+  ExportAWSEc2FlowLogsRAARole:
+    Description: "ARN of the AWSEc2FlowLogsRAARole"
+    Value: !GetAtt AWSEc2FlowLogsRAARole.Arn
+    Export:
+      Name:  !Join ['', [!Ref "Environment", "-AWSEc2FlowLogsRAARoleArn" ]]
+  ExportAWSRedshiftThoughtSpotRole:
+    Description: "ARN of the AWSRedshiftThoughtSpotRole"
+    Value: !GetAtt AWSRedshiftThoughtSpotRole.Arn
+    Export:
+      Name:  !Join ['', [!Ref "Environment", "-AWSRedshiftThoughtSpotRoleArn" ]]
+  ExportRandaSSMAccessRole:
+    Description: "ARN of the RandaSSMAccessRole"
+    Value: !GetAtt RandaSSMAccessRole.Arn
+    Export:
+      Name:  !Join ['', [!Ref "Environment", "-RandaSSMAccessRoleArn" ]]
+  ExportRandaSSMInstanceProfile:
+    Description: "ARN of the RandaSSMInstanceProfile"
+    Value: !GetAtt RandaSSMInstanceProfile.Arn
+    Export:
+      Name:  !Join ['', [!Ref "Environment", "-RandaSSMInstanceProfileArn" ]]
+  ExportRandaSSMAccessPolicy:
+    Description: "ARN of the RandaSSMAccessPolicy"
+    Value: !Ref RandaSSMAccessPolicy
+    Export:
+      Name:  !Join ['', [!Ref "Environment", "-RandaSSMAccessPolicyArn" ]]

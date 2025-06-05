@@ -1,0 +1,183 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Metadata:
+  Generator: "former2 helped a bit"
+Description: "Stack for RANDA-ECOMM Notifications layer. Step:4"
+
+Parameters:
+  Environment:
+    Type: "String"
+    Default: "dev"
+    Description: By selecting the prefix i.e. "dev", you will create new stack for RAA  product.
+    AllowedValues:
+      - "dev"
+  ProductName:
+    Type: "String"
+    Default: "RANDA-ECOMM"
+    Description: This is reserved for Product Name. No need to change it.
+    AllowedValues:
+      - "RANDA-ECOMM"
+
+Resources:
+
+  RedshiftNotificationsSNSTopic:
+    Type: "AWS::SNS::Topic"
+    Properties:
+      DisplayName: !Join ['', [!Ref "Environment", "-raa-ecomm-notifications" ]]
+      TopicName: !Join ['', [!Ref "Environment", "-raa-ecomm-notifications" ]]
+      Tags: 
+        - Key: "Environment"
+          Value: !Ref Environment
+        - key: "Description"
+          Value: "notifications topic"
+        - Key: "Name"
+          Value:  !Join ['', [!Ref "Environment", "-raa-ecomm-notifications" ]]
+        - Key: "Product"
+          Value: !Ref ProductName
+
+  RedshiftNotificationsEmailSubscription:
+    Type: "AWS::SNS::Subscription"
+    Properties:
+      Protocol: "email"
+      TopicArn: !Ref RedshiftNotificationsSNSTopic
+      Endpoint: "jasmin.cerkic@haggar.com"
+
+  VPCNotificationsSNSTopic:
+    Type: "AWS::SNS::Topic"
+    Properties:
+      DisplayName: !Join ['', [!Ref "Environment", "-raa-ecomm-vpc-notifications" ]]
+      TopicName: !Join ['', [!Ref "Environment", "-raa-ecomm-vpc-notifications" ]]
+      Tags: 
+        - Key: "Environment"
+          Value: !Ref Environment
+        - Key: "Description"
+          Value: "vpc notifications topic"
+        - Key: "Name"
+          Value:  !Join ['', [!Ref "Environment", "-raa-ecomm-vpc-notifications" ]]
+        - Key: "Product"
+          Value: !Ref ProductName
+
+  VPCNotificationsEmailSubscription:
+    Type: "AWS::SNS::Subscription"
+    Properties:
+      Protocol: "email"
+      TopicArn: !Ref VPCNotificationsSNSTopic
+      Endpoint: "jasmin.cerkic@haggar.com"
+
+  BudgetAlertsSNSTopic:
+    Type: "AWS::SNS::Topic"
+    Properties:
+      DisplayName: !Join ['', [!Ref "Environment", "-raa-ecomm-notifications" ]]
+      TopicName: !Join ['', [!Ref "Environment", "-raa-ecomm-notifications" ]]
+      Tags:
+        - Key: "Environment"
+          Value: !Ref Environment
+        - Key: "Description"
+          Value: "Budget notifications topic"
+        - Key: "Name"
+          Value: !Join ['', [!Ref "Environment", "-raa-ecomm-notifications" ]]
+        - Key: "Product"
+          Value: !Ref ProductName
+
+  BudgetNotificationsEmailSubscription:
+    Type: "AWS::SNS::Subscription"
+    Properties:
+      Protocol: "email"
+      TopicArn: !Ref BudgetAlertsSNSTopic
+      Endpoint: "aws.alerts.billing@randa.net"    
+
+  MonthlyBudget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetName: MyMonthlyBudget
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit:
+          Amount: 1500.00
+          Unit: USD
+      NotificationsWithSubscribers:
+        - Notification:
+            NotificationType: ACTUAL
+            ThresholdType: PERCENTAGE
+            Threshold: 90
+            ComparisonOperator: GREATER_THAN
+          Subscribers:
+            - SubscriptionType: SNS
+              Address: !Ref BudgetAlertsSNSTopic
+
+  DailyBudget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetName: MyDailyBudget
+        BudgetType: COST
+        TimeUnit: DAILY
+        BudgetLimit:
+          Amount: 100.00
+          Unit: USD
+      NotificationsWithSubscribers:
+        - Notification:
+            NotificationType: ACTUAL
+            ThresholdType: PERCENTAGE
+            Threshold: 75
+            ComparisonOperator: GREATER_THAN
+          Subscribers:
+            - SubscriptionType: SNS
+              Address: !Ref BudgetAlertsSNSTopic
+
+  SNSTopicPolicy:
+      Type: AWS::SNS::TopicPolicy
+      Properties:
+        PolicyDocument:
+          Statement:
+            - Sid: AllowServices
+              Effect: Allow
+              Principal:
+                Service:
+                  - events.amazonaws.com
+                  - cloudwatch.amazonaws.com
+                  - budgets.amazonaws.com 
+              Action: 
+                - "sns:GetTopicAttributes"
+                - "sns:Subscribe"
+                - "sns:ListSubscriptionsByTopic"
+                - "sns:Publish"
+              Resource:
+                - !Ref RedshiftNotificationsSNSTopic
+                - !Ref BudgetAlertsSNSTopic 
+        Topics:
+          - !Ref RedshiftNotificationsSNSTopic
+          - !Ref VPCNotificationsSNSTopic
+          - !Ref BudgetAlertsSNSTopic 
+
+Outputs:
+  ExportRedshiftClusterEndpointTopicArn:
+    Description: "Redshift notifications SNS topic ARN"
+    Value: !GetAtt RedshiftNotificationsSNSTopic.TopicArn
+    Export:
+      Name:  !Join ['', [!Ref "Environment", "-RedshiftClusterEndpointTopicArn" ]] 
+  ExportRedshiftClusterEndpointTopicName:
+    Description: "Redshift notifications SNS topic NAME"
+    Value: !GetAtt RedshiftNotificationsSNSTopic.TopicName
+    Export:
+      Name:  !Join ['', [!Ref "Environment", "-RedshiftClusterEndpointTopicName" ]] 
+  ExportVPCNotificationsSNSTopicArn:
+    Description: "VPC notifications SNS topic ARN"
+    Value: !GetAtt VPCNotificationsSNSTopic.TopicArn
+    Export:
+      Name:  !Join ['', [!Ref "Environment", "-VPCNotificationsSNSTopicArn" ]] 
+  ExportVPCNotificationsSNSTopicName:
+    Description: "VPC notifications SNS topic NAME"
+    Value: !GetAtt VPCNotificationsSNSTopic.TopicName
+    Export:
+      Name:  !Join ['', [!Ref "Environment", "-VPCNotificationsSNSTopicName" ]] 
+  ExportBudgetAlertsTopicArn:
+    Description: "Budget alerts SNS topic ARN"
+    Value: !GetAtt BudgetAlertsSNSTopic.TopicArn
+    Export:
+      Name: !Join ['', [!Ref Environment, "-BudgetAlertsTopicArn"]]
+  ExportBudgetAlertsTopicName:
+    Description: "Budget alerts SNS topic NAME"
+    Value: !GetAtt BudgetAlertsSNSTopic.TopicName
+    Export:
+      Name: !Join ['', [!Ref Environment, "-BudgetAlertsSNSTopicName"]]

@@ -1,0 +1,2132 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Metadata:
+  Generator: "former2 helped a bit"
+Description: "Stack for RANDA-ECOMM VPC, Subnet, IGW, NATGWY layer. Step:2"
+Parameters:
+  Environment:
+    Type: "String"
+    Default: "dev"
+    Description: By selecting the prefix i.e. "dev", you will create new stack for RAA  product.
+    AllowedValues:
+      - "dev"
+  ProductName:
+    Type: "String"
+    Default: "RANDA-ECOMM"
+    Description: This is reserved for Product Name. No need to change it.
+    AllowedValues:
+      - "RANDA-ECOMM"
+
+Mappings:
+  # Mappings for subnets, 3 public and 6 private subnets. 
+  # Each Zone will have 1 public subnet and 2 private subnets
+  # Note: For Disaster Recovery VPC, we must use different set of CIDR blocks that will not overlap 10.1.x.x block below.
+  # Use helper web site: https://www.site24x7.com/tools/ipv4-subnetcalculator.html and in this case I've entered  "10.160.0.100/16", then select Number Of Subnets dropdown
+  # and select "16". You may also notice that below, we are not using 16 subnets but 9 all together. This is done on purpose so if we need to expand, we can.
+  SubnetConfig:
+    VPC:
+      CIDR: '10.162.0.100/16'
+    PublicA:
+      CIDR: '10.162.0.0/20'
+    PrivateA1:
+      CIDR: '10.162.16.0/20'
+    PrivateA2:
+      CIDR: '10.162.32.0/20'
+    PublicB:
+      CIDR: '10.162.48.0/20'
+    PrivateB1:
+      CIDR: '10.162.64.0/20'
+    PrivateB2:
+      CIDR: '10.162.80.0/20'
+    PublicC:
+      CIDR: '10.162.96.0/20'
+    PrivateC1:
+      CIDR: '10.162.112.0/20'
+    PrivateC2:
+      CIDR: '10.162.128.0/20'
+    PrivateA3: 
+      CIDR: '10.162.144.0/20'
+    PrivateB3: 
+      CIDR: '10.162.160.0/20'
+    PrivateC3: 
+      CIDR: '10.162.176.0/20'
+
+
+Resources:
+  #VPC - Main configuration
+  VPC:
+    Type: "AWS::EC2::VPC"
+    Properties:
+      CidrBlock: !FindInMap ['SubnetConfig', 'VPC', 'CIDR']
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      InstanceTenancy: "default"
+      Tags: 
+      - 
+        Key: "Environment"
+        Value: !Ref Environment
+      - 
+        Key: "Description"
+        Value: "host RAA product line"
+      - 
+        Key: "Name"
+        Value:  !Join ['', [!Ref "Environment", "-raa-ecomm-vpc" ]]
+      - 
+        Key: "Product"
+        Value: !Ref ProductName
+
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+         Fn::Select:
+         - 0
+         - Fn::GetAZs: {Ref: 'AWS::Region'}
+      VpcId: !Ref 'VPC'
+      CidrBlock: !FindInMap ['SubnetConfig', 'PublicA', 'CIDR']
+      MapPublicIpOnLaunch: false
+      Tags: 
+      - 
+        Key: "Description"
+        Value: "public subnet hence publicly accessible products only"
+      - 
+        Key: "Environment"
+        Value: !Ref Environment
+      - 
+        Key: "Name"
+        Value: !Join ['', [!Ref "Environment", "-PublicA-Subnet" ]]
+      - 
+        Key: "Product"
+        Value: !Ref ProductName
+  
+  PublicSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+         Fn::Select:
+         - 1
+         - Fn::GetAZs: {Ref: 'AWS::Region'}
+      VpcId: !Ref 'VPC'
+      CidrBlock: !FindInMap ['SubnetConfig', 'PublicB', 'CIDR']
+      MapPublicIpOnLaunch: false
+      Tags: 
+      - 
+        Key: "Description"
+        Value: "public subnet hence publicly accessible products only"
+      - 
+        Key: "Environment"
+        Value: !Ref Environment
+      - 
+        Key: "Name"
+        Value: !Join ['', [!Ref "Environment", "-PublicB-Subnet" ]]
+      - 
+        Key: "Product"
+        Value: !Ref ProductName
+
+
+
+  PublicSubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+         Fn::Select:
+         - 2
+         - Fn::GetAZs: {Ref: 'AWS::Region'}
+      VpcId: !Ref 'VPC'
+      CidrBlock: !FindInMap ['SubnetConfig', 'PublicC', 'CIDR']
+      MapPublicIpOnLaunch: false
+      Tags: 
+      - 
+        Key: "Description"
+        Value: "public subnet hence publicly accessible products only"
+      - 
+        Key: "Environment"
+        Value: !Ref Environment
+      - 
+        Key: "Name"
+        Value: !Join ['', [!Ref "Environment", "-PublicC-Subnet" ]]
+      - 
+        Key: "Product"
+        Value: !Ref ProductName
+
+
+  SubnetRouteTableAssociationPublicSubnetA:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnetA
+
+  SubnetRouteTableAssociationPublicSubnetB:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnetB
+
+  SubnetRouteTableAssociationPublicSubnetC:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnetC
+
+  SubnetAssociationPublicSubnetA:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetA
+      NetworkAclId: !Ref VPCNetworkAcl
+
+  SubnetAssociationPublicSubnetBA:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetB
+      NetworkAclId: !Ref VPCNetworkAcl
+
+  SubnetAssociationPublicSubnetC:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetC
+      NetworkAclId: !Ref VPCNetworkAcl
+
+  SubnetAssociationSubnetPrivateA1:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      SubnetId: !Ref SubnetPrivateA1
+      NetworkAclId: !Ref VPCNetworkAcl
+
+  SubnetAssociationSubnetPrivateA2:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      SubnetId: !Ref SubnetPrivateA2
+      NetworkAclId: !Ref VPCNetworkAcl
+
+  SubnetAssociationSubnetPrivateA3:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      SubnetId: !Ref SubnetPrivateA3
+      NetworkAclId: !Ref VPCNetworkAcl
+
+  SubnetAssociationSubnetPrivateB1:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      SubnetId: !Ref SubnetPrivateB1
+      NetworkAclId: !Ref VPCNetworkAcl
+
+  SubnetAssociationSubnetPrivateB2:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      SubnetId: !Ref SubnetPrivateB2
+      NetworkAclId: !Ref VPCNetworkAcl
+
+  SubnetAssociationSubnetPrivateB3:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      SubnetId: !Ref SubnetPrivateB3
+      NetworkAclId: !Ref VPCNetworkAcl
+
+
+  SubnetAssociationSubnetPrivateC1:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      SubnetId: !Ref SubnetPrivateC1
+      NetworkAclId: !Ref VPCNetworkAcl
+
+  SubnetAssociationSubnetPrivateC2:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      SubnetId: !Ref SubnetPrivateC2
+      NetworkAclId: !Ref VPCNetworkAcl
+
+  SubnetAssociationSubnetPrivateC3:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      SubnetId: !Ref SubnetPrivateC3
+      NetworkAclId: !Ref VPCNetworkAcl
+
+  SubnetPrivateA1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+        Fn::Select:
+        - 0
+        - Fn::GetAZs: {Ref: 'AWS::Region'}
+      VpcId: !Ref 'VPC'
+      CidrBlock: !FindInMap ['SubnetConfig', 'PrivateA1', 'CIDR']
+      MapPublicIpOnLaunch: false
+      Tags: 
+      - 
+        Key: "Description"
+        Value: "private subnet hence only accessible from Public subnet or between other subnets"
+      - 
+        Key: "Environment"
+        Value: !Ref Environment
+      - 
+        Key: "Name"
+        Value: !Join ['', [!Ref "Environment", "-PrivateA1-Subnet" ]]
+      - 
+        Key: "Product"
+        Value: !Ref ProductName
+
+
+  SubnetRouteTableAssociationPrivateA1SubnetA:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableA
+      SubnetId: !Ref SubnetPrivateA1
+
+
+  SubnetPrivateA2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+        Fn::Select:
+        - 0
+        - Fn::GetAZs: {Ref: 'AWS::Region'}
+      VpcId: !Ref 'VPC'
+      CidrBlock: !FindInMap ['SubnetConfig', 'PrivateA2', 'CIDR']
+      MapPublicIpOnLaunch: false
+      Tags: 
+      - 
+        Key: "Description"
+        Value: "private subnet hence only accessible from Public subnet or between other subnets"
+      - 
+        Key: "Environment"
+        Value: !Ref Environment
+      - 
+        Key: "Name"
+        Value: !Join ['', [!Ref "Environment", "-PrivateA2-Subnet" ]]
+      - 
+        Key: "Product"
+        Value: !Ref ProductName
+
+
+  SubnetRouteTableAssociationPrivateA2ZoneA:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableA
+      SubnetId: !Ref SubnetPrivateA2
+
+
+
+  SubnetPrivateA3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+        Fn::Select:
+        - 0
+        - Fn::GetAZs: {Ref: 'AWS::Region'}
+      VpcId: !Ref 'VPC'
+      CidrBlock: !FindInMap ['SubnetConfig', 'PrivateA3', 'CIDR']
+      MapPublicIpOnLaunch: false
+      Tags: 
+      - 
+        Key: "Description"
+        Value: "private subnet hence only accessible from Public subnet or between other subnets"
+      - 
+        Key: "Environment"
+        Value: !Ref Environment
+      - 
+        Key: "Name"
+        Value: !Join ['', [!Ref "Environment", "-PrivateA3-Subnet" ]]
+      - 
+        Key: "Product"
+        Value: !Ref ProductName
+
+
+  SubnetRouteTableAssociationPrivateA3ZoneA:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableA
+      SubnetId: !Ref SubnetPrivateA3
+
+
+  SubnetPrivateB1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+        Fn::Select:
+        - 1
+        - Fn::GetAZs: {Ref: 'AWS::Region'}
+      VpcId: !Ref 'VPC'
+      CidrBlock: !FindInMap ['SubnetConfig', 'PrivateB1', 'CIDR']
+      MapPublicIpOnLaunch: false
+      Tags: 
+      - 
+        Key: "Description"
+        Value: "private subnet hence only accessible from Public subnet or between other subnets"
+      - 
+        Key: "Environment"
+        Value: !Ref Environment
+      - 
+        Key: "Name"
+        Value: !Join ['', [!Ref "Environment", "-PrivateB1-Subnet" ]]
+      - 
+        Key: "Product"
+        Value: !Ref ProductName
+
+
+  SubnetRouteTableAssociationPrivateB1ZoneB:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableB
+      SubnetId: !Ref SubnetPrivateB1
+
+
+
+
+  SubnetPrivateB2:
+      Type: AWS::EC2::Subnet
+      Properties:
+        AvailabilityZone:
+          Fn::Select:
+          - 1
+          - Fn::GetAZs: {Ref: 'AWS::Region'}
+        VpcId: !Ref 'VPC'
+        CidrBlock: !FindInMap ['SubnetConfig', 'PrivateB2', 'CIDR']
+        MapPublicIpOnLaunch: false
+        Tags: 
+        - 
+          Key: "Description"
+          Value: "private subnet hence only accessible from Public subnet or between other subnets"
+        - 
+          Key: "Environment"
+          Value: !Ref Environment
+        - 
+          Key: "Name"
+          Value: !Join ['', [!Ref "Environment", "-PrivateB2-Subnet" ]]
+        - 
+          Key: "Product"
+          Value: !Ref ProductName
+
+
+  SubnetRouteTableAssociationPrivateB2ZoneB:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableB
+      SubnetId: !Ref SubnetPrivateB2
+
+
+  SubnetPrivateB3:
+      Type: AWS::EC2::Subnet
+      Properties:
+        AvailabilityZone:
+          Fn::Select:
+          - 1
+          - Fn::GetAZs: {Ref: 'AWS::Region'}
+        VpcId: !Ref 'VPC'
+        CidrBlock: !FindInMap ['SubnetConfig', 'PrivateB3', 'CIDR']
+        MapPublicIpOnLaunch: false
+        Tags: 
+        - 
+          Key: "Description"
+          Value: "private subnet hence only accessible from Public subnet or between other subnets"
+        - 
+          Key: "Environment"
+          Value: !Ref Environment
+        - 
+          Key: "Name"
+          Value: !Join ['', [!Ref "Environment", "-PrivateB3-Subnet" ]]
+        - 
+          Key: "Product"
+          Value: !Ref ProductName
+
+
+  SubnetRouteTableAssociationPrivateB3ZoneB:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableB
+      SubnetId: !Ref SubnetPrivateB3
+
+
+
+  SubnetPrivateC1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+        Fn::Select:
+        - 2
+        - Fn::GetAZs: {Ref: 'AWS::Region'}
+      VpcId: !Ref 'VPC'
+      CidrBlock: !FindInMap ['SubnetConfig', 'PrivateC1', 'CIDR']
+      MapPublicIpOnLaunch: false
+      Tags: 
+      - 
+        Key: "Description"
+        Value: "private subnet hence only accessible from Public subnet or between other subnets"
+      - 
+        Key: "Environment"
+        Value: !Ref Environment
+      - 
+        Key: "Name"
+        Value: !Join ['', [!Ref "Environment", "-PrivateC1-Subnet" ]]
+      - 
+        Key: "Product"
+        Value: !Ref ProductName
+
+
+  SubnetRouteTableAssociationPrivateC1ZoneC:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableC
+      SubnetId: !Ref SubnetPrivateC1
+
+
+
+
+
+  SubnetPrivateC2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+        Fn::Select:
+        - 2
+        - Fn::GetAZs: {Ref: 'AWS::Region'}
+      VpcId: !Ref 'VPC'
+      CidrBlock: !FindInMap ['SubnetConfig', 'PrivateC2', 'CIDR']
+      MapPublicIpOnLaunch: false
+      Tags: 
+      - 
+        Key: "Description"
+        Value: "private subnet hence only accessible from Public subnet or between other subnets"
+      - 
+        Key: "Environment"
+        Value: !Ref Environment
+      - 
+        Key: "Name"
+        Value: !Join ['', [!Ref "Environment", "-PrivateC2-Subnet" ]]
+      - 
+        Key: "Product"
+        Value: !Ref ProductName
+
+
+  SubnetRouteTableAssociationPrivateC2ZoneC:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableC
+      SubnetId: !Ref SubnetPrivateC2
+
+
+  SubnetPrivateC3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+        Fn::Select:
+        - 2
+        - Fn::GetAZs: {Ref: 'AWS::Region'}
+      VpcId: !Ref 'VPC'
+      CidrBlock: !FindInMap ['SubnetConfig', 'PrivateC3', 'CIDR']
+      MapPublicIpOnLaunch: false
+      Tags: 
+      - 
+        Key: "Description"
+        Value: "private subnet hence only accessible from Public subnet or between other subnets"
+      - 
+        Key: "Environment"
+        Value: !Ref Environment
+      - 
+        Key: "Name"
+        Value: !Join ['', [!Ref "Environment", "-PrivateC3-Subnet" ]]
+      - 
+        Key: "Product"
+        Value: !Ref ProductName
+
+
+  SubnetRouteTableAssociationPrivateC3ZoneC:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableC
+      SubnetId: !Ref SubnetPrivateC3
+
+
+  VPCDHCPOptionsAssociation:
+    Type: "AWS::EC2::VPCDHCPOptionsAssociation"
+    Properties:
+      DhcpOptionsId: "default"
+      VpcId: !Ref VPC
+
+  InternetGateway:
+    Type: "AWS::EC2::InternetGateway"
+    Properties:
+      Tags: 
+      - 
+        Key: "Name"
+        Value: !Join ['', [!Ref "Environment", "-RAA-IGW" ]]
+      - 
+        Key: "Product"
+        Value: !Ref ProductName
+
+  VPCGatewayAttachmentInternetGateway:
+    Type: "AWS::EC2::VPCGatewayAttachment"
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+
+  PublicRouteInternet:
+    Type: "AWS::EC2::Route"
+    Properties:
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId: !Ref InternetGateway
+      RouteTableId: !Ref PublicRouteTable
+
+      
+
+  NatGatewayA:
+    Type: "AWS::EC2::NatGateway"
+    Properties:
+      SubnetId: !Ref PublicSubnetA
+      AllocationId: !GetAtt EIPA.AllocationId
+      Tags: 
+      - 
+        Key: "Name"
+        Value: !Join ['', [!Ref "Environment", "-RAA-NetGW-A" ]]
+        
+  NatGatewayB:
+    Type: "AWS::EC2::NatGateway"
+    Properties:
+      SubnetId: !Ref PublicSubnetB
+      AllocationId: !GetAtt EIPB.AllocationId
+      Tags: 
+      - 
+        Key: "Name"
+        Value: !Join ['', [!Ref "Environment", "-RAA-NetGW-B" ]]
+
+
+  NatGatewayC:
+    Type: "AWS::EC2::NatGateway"
+    Properties:
+      SubnetId: !Ref PublicSubnetC
+      AllocationId: !GetAtt EIPC.AllocationId
+      Tags: 
+      - 
+        Key: "Name"
+        Value: !Join ['', [!Ref "Environment", "-RAA-NetGW-C" ]]
+
+  PrivateRouteTable:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref VPC
+      Tags: 
+      - 
+        Key: "Name"
+        Value: !Join ['', [!Ref "Environment", "-rt-raa-route-private" ]] 
+
+
+  PrivateRouteTableA:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref VPC
+      Tags: 
+      - 
+        Key: "Name"
+        Value: !Join ['', [!Ref "Environment", "-rt-raa-route-privateA" ]] 
+
+  PrivateRouteTableB:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref VPC
+      Tags: 
+      - 
+        Key: "Name"
+        Value: !Join ['', [!Ref "Environment", "-rt-raa-route-privateB" ]] 
+
+
+  PrivateRouteTableC:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref VPC
+      Tags: 
+      - 
+        Key: "Name"
+        Value: !Join ['', [!Ref "Environment", "-rt-raa-route-privateC" ]] 
+
+
+  PublicRouteTable:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref VPC
+      Tags: 
+      - 
+        Key: "Name"
+        Value: !Join ['', [!Ref "Environment", "-rt-raa-route-public" ]] 
+
+
+  RouteNatGateway:
+    Type: "AWS::EC2::Route"
+    Properties:
+      DestinationCidrBlock: "0.0.0.0/0"
+      NatGatewayId: !Ref NatGatewayA
+      RouteTableId: !Ref PrivateRouteTableA
+
+  RouteNatGatewayB:
+    Type: "AWS::EC2::Route"
+    Properties:
+      DestinationCidrBlock: "0.0.0.0/0"
+      NatGatewayId: !Ref NatGatewayB
+      RouteTableId: !Ref PrivateRouteTableB
+
+  RouteNatGatewayC:
+    Type: "AWS::EC2::Route"
+    Properties:
+      DestinationCidrBlock: "0.0.0.0/0"
+      NatGatewayId: !Ref NatGatewayC
+      RouteTableId: !Ref PrivateRouteTableC
+
+  PrimaryNetworkInterface:
+    Type: "AWS::EC2::NetworkInterface"
+    Properties:
+      Description: "Primary network interface for Public Subnet A"
+      SubnetId: !Ref PublicSubnetA
+      SourceDestCheck: true
+      GroupSet: 
+      - !Ref SecurityGroupSSH
+      - !Ref SecurityGroupHTTPS
+      
+      
+  PrimaryNetworkInterfaceB:
+    Type: "AWS::EC2::NetworkInterface"
+    Properties:
+      Description: "Primary network interface for Public Subnet B"
+      SubnetId: !Ref PublicSubnetB
+      SourceDestCheck: true
+      GroupSet: 
+      - !Ref SecurityGroupSSH
+      - !Ref SecurityGroupHTTPS
+
+  PrimaryNetworkInterfaceC:
+    Type: "AWS::EC2::NetworkInterface"
+    Properties:
+      Description: "Primary network interface for Public Subnet C"
+      SubnetId: !Ref PublicSubnetC
+      SourceDestCheck: true
+      GroupSet: 
+      - !Ref SecurityGroupSSH
+      - !Ref SecurityGroupHTTPS
+
+  EIPA:
+    Type: "AWS::EC2::EIP"
+    Properties:
+      Domain: "vpc"
+      Tags: 
+      - 
+        Key: "Description"
+        Value: "Elastic IP"
+      - 
+        Key: "Environment"
+        Value: !Ref Environment
+      - 
+        Key: "Product"
+        Value: !Ref ProductName
+        
+  EIPB:
+    Type: "AWS::EC2::EIP"
+    Properties:
+      Domain: "vpc"
+      Tags: 
+      - 
+        Key: "Description"
+        Value: "Elastic IP"
+      - 
+        Key: "Environment"
+        Value: !Ref Environment
+      - 
+        Key: "Product"
+        Value: !Ref ProductName
+
+  EIPC:
+    Type: "AWS::EC2::EIP"
+    Properties:
+      Domain: "vpc"
+      Tags: 
+      - 
+        Key: "Description"
+        Value: "Elastic IP"
+      - 
+        Key: "Environment"
+        Value: !Ref Environment
+      - 
+        Key: "Product"
+        Value: !Ref ProductName
+
+        
+
+  VPCEndpointS3A:
+    Type: "AWS::EC2::VPCEndpoint"
+    Properties:
+      VpcEndpointType: "Gateway"
+      VpcId: !Ref VPC
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.s3"
+      PolicyDocument: "{\"Version\":\"2008-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":\"*\",\"Action\":\"*\",\"Resource\":\"*\"}]}"
+      RouteTableIds: 
+      - !Ref PrivateRouteTableA
+      PrivateDnsEnabled: false #cannot be true for Gateway but only for Interface enpoints
+
+
+  VPCEndpointS3B:
+    Type: "AWS::EC2::VPCEndpoint"
+    Properties:
+      VpcEndpointType: "Gateway"
+      VpcId: !Ref VPC
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.s3"
+      PolicyDocument: "{\"Version\":\"2008-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":\"*\",\"Action\":\"*\",\"Resource\":\"*\"}]}"
+      RouteTableIds: 
+      - !Ref PrivateRouteTableB
+      PrivateDnsEnabled: false #cannot be true for Gateway but only for Interface enpoints
+
+
+  VPCEndpointS3C:
+    Type: "AWS::EC2::VPCEndpoint"
+    Properties:
+      VpcEndpointType: "Gateway"
+      VpcId: !Ref VPC
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.s3"
+      PolicyDocument: "{\"Version\":\"2008-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":\"*\",\"Action\":\"*\",\"Resource\":\"*\"}]}"
+      RouteTableIds: 
+      - !Ref PrivateRouteTableC
+      PrivateDnsEnabled: false #cannot be true for Gateway but only for Interface enpoints
+
+
+  VPCEndpointDynamoDbA:
+    Type: "AWS::EC2::VPCEndpoint"
+    Properties:
+      VpcEndpointType: "Gateway"
+      VpcId: !Ref VPC
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.dynamodb"
+      PolicyDocument: "{\"Version\":\"2008-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":\"*\",\"Action\":\"*\",\"Resource\":\"*\"}]}"
+      RouteTableIds: 
+      - !Ref PrivateRouteTableA
+      PrivateDnsEnabled: false #cannot be true for Gateway but only for Interface enpoints
+
+  VPCEndpointDynamoDbB:
+    Type: "AWS::EC2::VPCEndpoint"
+    Properties:
+      VpcEndpointType: "Gateway"
+      VpcId: !Ref VPC
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.dynamodb"
+      PolicyDocument: "{\"Version\":\"2008-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":\"*\",\"Action\":\"*\",\"Resource\":\"*\"}]}"
+      RouteTableIds: 
+      - !Ref PrivateRouteTableB
+      PrivateDnsEnabled: false #cannot be true for Gateway but only for Interface enpoints
+
+
+  VPCEndpointDynamoDbC:
+    Type: "AWS::EC2::VPCEndpoint"
+    Properties:
+      VpcEndpointType: "Gateway"
+      VpcId: !Ref VPC
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.dynamodb"
+      PolicyDocument: "{\"Version\":\"2008-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":\"*\",\"Action\":\"*\",\"Resource\":\"*\"}]}"
+      RouteTableIds: 
+      - !Ref PrivateRouteTableC
+      PrivateDnsEnabled: false #cannot be true for Gateway but only for Interface enpoints
+
+
+  VPCEndpointGlueB:
+    Type: "AWS::EC2::VPCEndpoint"
+    Properties:
+      VpcEndpointType: "Interface"
+      VpcId: !Ref VPC
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.glue"
+      PolicyDocument: "{\"Version\":\"2008-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":\"*\",\"Action\":\"*\",\"Resource\":\"*\"}]}"
+      SubnetIds: 
+      - !Ref SubnetPrivateA2
+      - !Ref SubnetPrivateB2
+      - !Ref SubnetPrivateC2
+      PrivateDnsEnabled: true
+      SecurityGroupIds: 
+          - !Ref RandaInternalSecurityGroup
+          #- Fn::ImportValue:
+          #    !Sub '${Environment}-DBSecurityGroup3'
+
+
+  VPCEndpointEC2:
+     Type: "AWS::EC2::VPCEndpoint"
+     Properties:
+       VpcEndpointType: "Interface"
+       VpcId: !Ref VPC
+       ServiceName: !Sub "com.amazonaws.${AWS::Region}.ec2"
+       PolicyDocument: "{\"Version\":\"2008-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":\"*\",\"Action\":\"*\",\"Resource\":\"*\"}]}"
+       SubnetIds: 
+       - !Ref SubnetPrivateA1
+       - !Ref SubnetPrivateB1
+       - !Ref SubnetPrivateC1
+       PrivateDnsEnabled: true
+       SecurityGroupIds: 
+           - !Ref RandaInternalSecurityGroup
+           - !Ref RandaDefaultSecurityGroup
+
+  VPCEndpointSSM:
+     Type: "AWS::EC2::VPCEndpoint"
+     Properties:
+       VpcEndpointType: "Interface"
+       VpcId: !Ref VPC
+       ServiceName: !Sub "com.amazonaws.${AWS::Region}.ssm"
+       PolicyDocument: "{\"Version\":\"2008-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":\"*\",\"Action\":\"*\",\"Resource\":\"*\"}]}"
+       SubnetIds: 
+       - !Ref SubnetPrivateA1
+       - !Ref SubnetPrivateB1
+       - !Ref SubnetPrivateC1
+       PrivateDnsEnabled: true
+       SecurityGroupIds: 
+           - !Ref RandaInternalSecurityGroup
+           - !Ref RandaDefaultSecurityGroup
+
+  VPCEndpointEC2Messages:
+     Type: "AWS::EC2::VPCEndpoint"
+     Properties:
+       VpcEndpointType: "Interface"
+       VpcId: !Ref VPC
+       ServiceName: !Sub "com.amazonaws.${AWS::Region}.ec2messages"
+       PolicyDocument: "{\"Version\":\"2008-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":\"*\",\"Action\":\"*\",\"Resource\":\"*\"}]}"
+       SubnetIds: 
+       - !Ref SubnetPrivateA1
+       - !Ref SubnetPrivateB1
+       - !Ref SubnetPrivateC1
+       PrivateDnsEnabled: true
+       SecurityGroupIds: 
+           - !Ref RandaInternalSecurityGroup
+           - !Ref RandaDefaultSecurityGroup
+
+  VPCEndpointSSMMessages:
+     Type: "AWS::EC2::VPCEndpoint"
+     Properties:
+       VpcEndpointType: "Interface"
+       VpcId: !Ref VPC
+       ServiceName: !Sub "com.amazonaws.${AWS::Region}.ssmmessages"
+       PolicyDocument: "{\"Version\":\"2008-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":\"*\",\"Action\":\"*\",\"Resource\":\"*\"}]}"
+       SubnetIds: 
+       - !Ref SubnetPrivateA1
+       - !Ref SubnetPrivateB1
+       - !Ref SubnetPrivateC1
+       PrivateDnsEnabled: true
+       SecurityGroupIds: 
+           - !Ref RandaInternalSecurityGroup
+           - !Ref RandaDefaultSecurityGroup
+
+
+
+  RandaDefaultSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      VpcId: !Ref VPC
+      GroupDescription: Default security group
+      GroupName: !Join ['',['SG-',!Ref Environment,"-default-security-group"]]
+      SecurityGroupIngress: 
+      - 
+        CidrIp: "0.0.0.0/0"
+        IpProtocol: "-1"
+      SecurityGroupEgress: 
+      - 
+        CidrIp: "0.0.0.0/0"
+        IpProtocol: "-1"
+      Tags:
+        - Key: Name
+          Value: !Join ['',['SG-',!Ref Environment,"-default-security-group"]]
+    Metadata:
+      Comment: This resource is only used to obtain the default security group ID
+
+
+
+  SecurityGroupSSH:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: "Open port 22 for SSH for remote capabilities"
+      GroupName: !Join ['',['SG-',!Ref Environment,"-SSH"]]
+      VpcId: !Ref VPC
+      SecurityGroupIngress: 
+      - 
+        CidrIp: !GetAtt VPC.CidrBlock
+        Description: ""
+        FromPort: 22
+        IpProtocol: "tcp"
+        ToPort: 22
+      SecurityGroupEgress: 
+      - 
+        CidrIp: "0.0.0.0/0"
+        IpProtocol: "-1"
+      Tags:
+        - Key: Name
+          Value: !Join ['',['SG-',!Ref Environment,"-SSH"]]
+
+  SecurityGroupHTTPS:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: "Open port 80 (http) and 443 (https) for web traffic"
+      GroupName: !Join ['',['SG-',!Ref Environment,"-HTTP-S"]]
+      VpcId: !Ref VPC
+      SecurityGroupIngress: 
+      - 
+        CidrIp: "0.0.0.0/0"
+        FromPort: 80
+        IpProtocol: "tcp"
+        ToPort: 80
+      - 
+        CidrIpv6: "::/0"
+        FromPort: 80
+        IpProtocol: "tcp"
+        ToPort: 80
+      - 
+        CidrIp: "0.0.0.0/0"
+        FromPort: 443
+        IpProtocol: "tcp"
+        ToPort: 443
+      - 
+        CidrIpv6: "::/0"
+        FromPort: 443
+        IpProtocol: "tcp"
+        ToPort: 443
+      SecurityGroupEgress: 
+      - 
+        CidrIp: "0.0.0.0/0"
+        IpProtocol: "-1"
+      Tags:
+        - Key: Name
+          Value: !Join ['',['SG-',!Ref Environment,"-HTTP-S"]]
+
+  CacheSecurityGroup:
+    DependsOn: VPC
+    Type: "AWS::EC2::SecurityGroup"
+    
+    Properties:
+      GroupName: !Join ['',['SG-',!Ref Environment,"-CACHE"]]
+      GroupDescription: "SecurityGroup for Cache Functions"
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Join ['',['SG-',!Ref Environment,"-CACHE"]]
+
+
+  CacheStorageSecurityGroup:
+    DependsOn: VPC
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupName: !Join ['',['SG-',!Ref Environment,"-CACHESTORAGE"]]
+      GroupDescription: Ingress for Redis Cluster
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+      - IpProtocol: '-1'
+        CidrIp: !GetAtt VPC.CidrBlock
+      - IpProtocol: tcp
+        FromPort: '6379'
+        ToPort: '6379'
+        SourceSecurityGroupId:
+          Ref: CacheSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Join ['',['SG-',!Ref Environment,"-CACHESTORAGE"]]
+
+  DBSecurityGroup1:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: "Security group for DB Cluster 1"
+      GroupName: !Join ['',['SG-',!Ref Environment,"-DB1"]]
+      VpcId: !Ref VPC        
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          CidrIp: !GetAtt VPC.CidrBlock
+      SecurityGroupEgress:
+        - IpProtocol: '-1'
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Join ['',['SG-',!Ref Environment,"-DB1"]]
+
+  DBSecurityGroup2:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: "Security group for MySQL DB Cluster 2"
+      GroupName: !Join ['',['SG-',!Ref Environment,"-DB2"]]
+      VpcId: !Ref VPC        
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          CidrIp: !GetAtt VPC.CidrBlock
+      SecurityGroupEgress:
+        - IpProtocol: '-1'
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Join ['',['SG-',!Ref Environment,"-DB2"]]
+
+  DBSecurityGroup3:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: "Security group for REDSHIFT DB Cluster 3"
+      GroupName: !Join ['',['SG-',!Ref Environment,"-REDSHIFT3"]]
+      VpcId: !Ref VPC        
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5439
+          ToPort: 5439
+          CidrIp: 0.0.0.0/0  # Allow traffic from the internet on Redshift port
+        - IpProtocol: tcp
+          FromPort: 5439
+          ToPort: 5439
+          CidrIp: !GetAtt VPC.CidrBlock
+        - IpProtocol: tcp
+          FromPort: 5439
+          ToPort: 5439
+          CidrIp: 35.160.44.67/32
+        - IpProtocol: tcp
+          FromPort: 5439
+          ToPort: 5439
+          CidrIp: 10.228.128.0/25
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: '-1'
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Join ['',['SG-',!Ref Environment,"-DB3"]]
+
+
+
+  DBRedshiftOnlySecurityGroup3:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: "Security group for REDSHIFT DB Cluster only"
+      GroupName: !Join ['',['SG-',!Ref Environment,"-REDSHIFT"]]
+      VpcId: !Ref VPC        
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5439
+          ToPort: 5439
+          CidrIp: 0.0.0.0/0  # Allow traffic from the internet on Redshift port
+        - IpProtocol: tcp
+          FromPort: 5439
+          ToPort: 5439
+          SourceSecurityGroupId: !Ref DBSecurityGroup3
+        - IpProtocol: tcp
+          FromPort: 5439
+          ToPort: 5439
+          CidrIp: !GetAtt VPC.CidrBlock
+        - IpProtocol: tcp
+          FromPort: 5439
+          ToPort: 5439
+          CidrIp: 35.160.44.67/32
+        - IpProtocol: tcp
+          FromPort: 5439
+          ToPort: 5439
+          CidrIp: 10.228.128.0/25
+      SecurityGroupEgress:
+        - IpProtocol: '-1'
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value:  !Join ['',['SG-',!Ref Environment,"-REDSHIFT"]]
+
+  NLBRedshiftSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for NLB supporting Redshift clustr
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5439
+          ToPort: 5439
+          SourceSecurityGroupId: !Ref DBSecurityGroup3
+        - IpProtocol: tcp
+          FromPort: 5439
+          ToPort: 5439
+          CidrIp: !GetAtt VPC.CidrBlock
+        - IpProtocol: tcp
+          FromPort: 5439
+          ToPort: 5439
+          CidrIp: 35.160.44.67/32
+        - IpProtocol: tcp
+          FromPort: 5439
+          ToPort: 5439
+          CidrIp: 10.228.128.0/25
+      SecurityGroupEgress:
+        - IpProtocol: '-1'
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value:  !Join ['',['SG-',!Ref Environment,"-REDSHIFT"]]
+
+
+
+  #vpc flow logs
+  RandaRejectedVPCFlowLogs:
+    Type: "AWS::EC2::FlowLog"
+    Properties:
+      DeliverLogsPermissionArn: 
+          Fn::ImportValue:
+              !Sub '${Environment}-AWSEc2FlowLogsRAARoleArn'
+      LogGroupName: !Ref VPCFlowLogsGroupName
+      ResourceId: !Ref VPC
+      ResourceType: VPC
+      LogDestinationType: cloud-watch-logs
+      TrafficType: REJECT 
+
+  VPCFlowLogsGroupName:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: 
+        !Join 
+          - '/'
+          - - '/raa-ecomm/vpcflowlogs'
+            - !Ref "Environment"
+      RetentionInDays: 30  # Optional: Specify the retention period for the logs (default is never expire)
+
+ 
+  SSMLogsGroupName:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      KmsKeyId:
+        Fn::ImportValue:
+          !Sub '${Environment}-ExportEncryptionKeyForS3Buckets'         
+      LogGroupName: 
+        !Join 
+          - '/'
+          - - '/raa/sessionmanager'
+            - !Ref "Environment"
+      RetentionInDays: 30  # Optional: Specify the retention period for the logs (default is never expire)
+
+
+  #s3 - storage
+  BucketLogRanda:
+    Type: "AWS::S3::Bucket"
+    #DeletionPolicy: Retain
+    Properties:
+      BucketName: !Join ['', [!Ref "Environment", "-logs-raa-ecomm" ]] 
+      Tags: 
+      - 
+        Key: "Environment"
+        Value: !Ref Environment
+      - 
+        Key: "Product"
+        Value: !Ref ProductName
+      - 
+        Key: "Purpose"
+        Value: "logs bucket only"
+      BucketEncryption: 
+        ServerSideEncryptionConfiguration: 
+        - 
+          ServerSideEncryptionByDefault: 
+            SSEAlgorithm: "AES256"
+          BucketKeyEnabled: true
+
+  BucketLogRandaPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref BucketLogRanda
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowRedshiftWrite
+            Effect: Allow
+            Principal:
+              Service: redshift.amazonaws.com
+            Action:
+              - s3:*
+            Resource:
+              !Sub '${BucketLogRanda.Arn}/*'
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref "AWS::AccountId"
+          - Sid: AllowRedshiftWrite2
+            Effect: Allow
+            Principal:
+              Service: redshift.amazonaws.com
+            Action:
+              - s3:*
+            Resource:
+              !Sub '${BucketLogRanda.Arn}'
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref "AWS::AccountId"
+          - Sid: AllowLambdaWrite
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action:
+              - s3:*
+            Resource:
+              !Sub '${BucketLogRanda.Arn}/*'
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref "AWS::AccountId"
+          - Sid: AllowLambdaWrite2
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action:
+              - s3:*
+            Resource:
+              !Sub '${BucketLogRanda.Arn}'
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref "AWS::AccountId"
+          - Sid: ExplicitELBAccountAccessToWrite1
+            Effect: Allow
+            Principal:
+              AWS: "arn:aws:iam::033677994240:root"
+            Action:
+              - s3:*
+            Resource:
+              !Sub '${BucketLogRanda.Arn}'
+          - Sid: ExplicitELBAccountAccessToWrite2
+            Effect: Allow
+            Principal:
+              AWS: "arn:aws:iam::033677994240:root"
+            Action:
+              - s3:*
+            Resource:
+              !Sub '${BucketLogRanda.Arn}/*'
+          - Sid: ExplicitELBAccountAccessToWrite3
+            Effect: Allow
+            Principal:
+              AWS: "arn:aws:iam::033677994240:root"
+            Action:
+              - s3:*
+            Resource:
+              !Sub '${BucketLogRanda.Arn}/nlbredshiftlogs/AWSLogs/${AWS::AccountId}/*'
+          - Sid: ExplicitELBAccountAccessToWrite4
+            Effect: Allow
+            Principal:
+              Service: elasticloadbalancing.amazonaws.com
+            Action:
+              - s3:*
+            Resource:
+              !Sub '${BucketLogRanda.Arn}/*'
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref "AWS::AccountId"
+                aws:SourceArn: !Sub 'arn:aws:elasticloadbalancing:${AWS::Region}:${AWS::AccountId}:*'
+          - Sid: ExplicitELBAccountAccessToWrite3
+            Effect: Allow
+            Principal:
+              Service: "delivery.logs.amazonaws.com"
+            Action:
+              - s3:*
+            Resource:
+              !Sub '${BucketLogRanda.Arn}/*'
+          - Sid: ExplicitELBAccountAccessToWrite4
+            Effect: Allow
+            Principal:
+              Service: "delivery.logs.amazonaws.com"
+            Action:
+              - s3:*
+            Resource:
+              !Sub '${BucketLogRanda.Arn}'
+
+
+
+  BucketBackupRanda:
+    Type: "AWS::S3::Bucket"
+    #DeletionPolicy: Retain
+    Properties:
+      BucketName: !Join ['', [!Ref "Environment", "-backups-raa-ecomm" ]] 
+      Tags: 
+      - 
+        Key: "Environment"
+        Value: !Ref Environment
+      - 
+        Key: "Product"
+        Value: !Ref ProductName
+      - 
+        Key: "Purpose"
+        Value: "backup files for backoffice and dbs and other needs"
+      BucketEncryption: 
+        ServerSideEncryptionConfiguration: 
+        - 
+          ServerSideEncryptionByDefault: 
+            SSEAlgorithm: "AES256"
+          BucketKeyEnabled: true
+
+  BucketDeploymentsRanda:
+    Type: "AWS::S3::Bucket"
+    #DeletionPolicy: Retain
+    Properties:
+      BucketName: !Join ['', [!Ref "Environment", "-deployments-raa-ecomm" ]] 
+      Tags: 
+      - 
+        Key: "Environment"
+        Value: !Ref Environment
+      - 
+        Key: "Product"
+        Value: !Ref ProductName
+      - 
+        Key: "Description"
+        Value: "for deployments purposes bucket only"
+
+  BucketDocumentStorageRanda:
+    Type: "AWS::S3::Bucket"
+    #DeletionPolicy: Retain
+    Properties:
+      BucketName: !Join ['', [!Ref "Environment", "-document-storage-raa-ecomm" ]] 
+      Tags: 
+      - 
+        Key: "Environment"
+        Value: !Ref Environment
+      - 
+        Key: "Product"
+        Value: !Ref ProductName
+      - 
+        Key: "Purpose"
+        Value: "store documents and images and videos and other files"
+      BucketEncryption: 
+        ServerSideEncryptionConfiguration: 
+        - 
+          ServerSideEncryptionByDefault: 
+            SSEAlgorithm: "AES256"
+          BucketKeyEnabled: true
+      VersioningConfiguration: 
+        Status: "Enabled"
+
+  BucketSecureStorageRanda:
+    Type: "AWS::S3::Bucket"
+    #DeletionPolicy: Retain
+    Properties:
+      BucketName: !Join ['', [!Ref "Environment", "-secure-storage-raa-ecomm" ]] 
+      Tags: 
+      - 
+        Key: "Environment"
+        Value: !Ref Environment
+      - 
+        Key: "Product"
+        Value: !Ref ProductName
+      - 
+        Key: "Purpose"
+        Value: "Secure bucket with special symmetric key and only accessed from within VPC and not externally available. "
+      BucketEncryption: 
+        ServerSideEncryptionConfiguration: 
+        - ServerSideEncryptionByDefault: 
+              KMSMasterKeyID: 
+                Fn::ImportValue:
+                  !Sub '${Environment}-ExportEncryptionKeyForS3Buckets'
+              SSEAlgorithm: aws:kms
+          BucketKeyEnabled: true
+      VersioningConfiguration: 
+        Status: "Enabled"
+
+
+  BucketDataWarehouseRanda:
+    Type: "AWS::S3::Bucket"
+    #DeletionPolicy: Retain
+    Properties:
+      BucketName: !Join ['', [!Ref "Environment", "-dw-raa-ecomm" ]] 
+      Tags: 
+      - 
+        Key: "Environment"
+        Value: !Ref Environment
+      - 
+        Key: "Product"
+        Value: !Ref ProductName
+      - 
+        Key: "Purpose"
+        Value: "Storage for RAA Data Warehouse needs."
+      BucketEncryption: 
+         ServerSideEncryptionConfiguration: 
+         - 
+          ServerSideEncryptionByDefault: 
+            SSEAlgorithm: "AES256"
+          BucketKeyEnabled: true
+      VersioningConfiguration: 
+        Status: "Enabled"
+ 
+
+
+  RandaPublicRedshiftNLB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Join ['', [!Ref "Environment", "-raa-public-redshift-nlb" ]] 
+      Scheme: internet-facing
+      Type: network 
+      SecurityGroups:
+        - !Ref NLBRedshiftSecurityGroup
+        - !Ref RandaInternalSecurityGroup
+      Subnets:
+        - !Ref PublicSubnetA
+        - !Ref PublicSubnetB
+        - !Ref PublicSubnetC
+      LoadBalancerAttributes:
+        - Key: 'load_balancing.cross_zone.enabled'
+          Value: 'true'
+        - Key: 'access_logs.s3.enabled'
+          Value: 'true'
+        - Key: 'access_logs.s3.bucket'
+          Value: !Ref BucketLogRanda
+        - Key: 'access_logs.s3.prefix'
+          Value: 'nlbredshiftlogs'
+      Tags: 
+      - 
+        Key: "Environment"
+        Value: !Ref Environment
+      - 
+        Key: "Product"
+        Value: !Ref ProductName
+      - 
+        Key: "Purpose"
+        Value: "Network Load Balancer for purpose of serving traffic to redshift cluster."
+
+
+  RandaVPCPrefixList:
+    Type: AWS::EC2::PrefixList
+    Properties:
+      PrefixListName: !Join ['',['pl-',!Ref Environment,"-vpcprefixlist"]]
+      AddressFamily: "IPv4"
+      MaxEntries: 100
+      Entries:
+        - Cidr: "40.142.96.144/29"
+          Description: "ODC2-DALLAS"
+        - Cidr: "40.142.17.48/29"
+          Description: "ODC1-CHICAGO"
+        - Cidr: "64.159.218.16/29"
+          Description: "CHI-CHICAGO CORPORATE"
+        - Cidr: "12.172.214.136/29"
+          Description: "LBJ1"
+        - Cidr: "216.198.87.144/29"
+          Description: "LBJ2"
+      Tags: 
+        - 
+          Key: "Description"
+          Value: "Randa VPC Prefix List"
+        - 
+          Key: "Environment"
+          Value: !Ref Environment
+        - 
+          Key: "Product"
+          Value: !Ref ProductName
+
+
+  VPCNetworkAcl:
+    Type: AWS::EC2::NetworkAcl
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Join ['', [!Ref "Environment", "-RAA-NACL-VPC-ECOMM" ]]
+
+  # uncomment this when AWS decides to allow prefix list for assignment, until then, wait (JC)
+  # RandaAllowAllInboundRule:
+  #   Type: AWS::EC2::NetworkAclEntry
+  #   Properties:
+  #     NetworkAclId: !Ref VPCNetworkAcl
+  #     RuleNumber: 100
+  #     Protocol: -1  # All protocols
+  #     RuleAction: allow
+  #     Egress: false
+  #     DestinationPrefixListId: !Ref RandaVPCPrefixList
+
+
+  RandaAllowAllInboundRuleVPCEndpointThoughtSpot:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      NetworkAclId: !Ref VPCNetworkAcl
+      RuleNumber: 99
+      Protocol: -1  # All protocols
+      RuleAction: allow
+      Egress: false
+      CidrBlock: 10.228.128.0/25
+
+  RandaAllowAllInboundRuleVPC:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      NetworkAclId: !Ref VPCNetworkAcl
+      RuleNumber: 100
+      Protocol: -1  # All protocols
+      RuleAction: allow
+      Egress: false
+      CidrBlock: !GetAtt VPC.CidrBlock
+
+  RandaAllowAllInboundRuleODC2Dallas:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      NetworkAclId: !Ref VPCNetworkAcl
+      RuleNumber: 101
+      Protocol: -1  # All protocols
+      RuleAction: allow
+      Egress: false
+      CidrBlock: 40.142.96.144/29
+
+  RandaAllowAllInboundRuleODC1Chicago:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      NetworkAclId: !Ref VPCNetworkAcl
+      RuleNumber: 102
+      Protocol: -1  # All protocols
+      RuleAction: allow
+      Egress: false
+      CidrBlock: 40.142.17.48/29
+
+  RandaAllowAllInboundRuleChicagoCorporate:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      NetworkAclId: !Ref VPCNetworkAcl
+      RuleNumber: 103
+      Protocol: -1  # All protocols
+      RuleAction: allow
+      Egress: false
+      CidrBlock: 64.159.218.16/29
+
+  RandaAllowAllInboundRuleLBJ1:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      NetworkAclId: !Ref VPCNetworkAcl
+      RuleNumber: 104
+      Protocol: -1  # All protocols
+      RuleAction: allow
+      Egress: false
+      CidrBlock: 12.172.214.136/29
+
+  RandaAllowAllInboundRuleLBJ2:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      NetworkAclId: !Ref VPCNetworkAcl
+      RuleNumber: 105
+      Protocol: -1  # All protocols
+      RuleAction: allow
+      Egress: false
+      CidrBlock: 216.198.87.144/29
+
+  RandaAllowAllInboundRuleThoughtSpotCloud:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      NetworkAclId: !Ref VPCNetworkAcl
+      RuleNumber: 106
+      Protocol: -1  # All protocols
+      RuleAction: allow
+      Egress: false
+      CidrBlock: 35.160.44.67/32
+
+
+  RandaAllowAllInboundRuleSafeRange:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      NetworkAclId: !Ref VPCNetworkAcl
+      RuleNumber: 107  
+      Protocol: 6  # Protocol number for TCP
+      RuleAction: allow
+      Egress: false  # false for inbound rule
+      CidrBlock: '0.0.0.0/0'  # Allow from all IP addresses
+      PortRange:
+        From: 1024
+        To: 65535
+
+
+  RandaAllowAllInboundRuleHTTP:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      NetworkAclId: !Ref VPCNetworkAcl
+      RuleNumber: 108 
+      Protocol: 6  # Protocol number for TCP
+      RuleAction: allow
+      Egress: false  # false for inbound rule
+      CidrBlock: '0.0.0.0/0'  # Allow from all IP addresses
+      PortRange:
+        From: 80
+        To: 80
+
+
+  RandaAllowAllInboundRuleHTTPS:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      NetworkAclId: !Ref VPCNetworkAcl
+      RuleNumber: 109
+      Protocol: 6  # Protocol number for TCP
+      RuleAction: allow
+      Egress: false  # false for inbound rule
+      CidrBlock: '0.0.0.0/0'  # Allow from all IP addresses
+      PortRange:
+        From: 443
+        To: 443
+
+
+  RandaDenyAllInboundRule:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      NetworkAclId: !Ref VPCNetworkAcl
+      RuleNumber: 32766  # Set to a value higher than any allow rules
+      Protocol: -1  # All protocols
+      RuleAction: deny
+      Egress: false
+      CidrBlock: 0.0.0.0/0  # Deny from all sources
+
+  RandaOutboundRule:
+      Type: AWS::EC2::NetworkAclEntry
+      DependsOn: VPCNetworkAcl
+      Properties:
+        NetworkAclId: !Ref VPCNetworkAcl
+        RuleNumber: 100
+        Protocol: -1
+        RuleAction: allow
+        Egress: true
+        CidrBlock: 0.0.0.0/0
+
+  RandaAllowAllOutboundRuleVPC:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      NetworkAclId: !Ref VPCNetworkAcl
+      RuleNumber: 101
+      Protocol: -1  # All protocols
+      RuleAction: allow
+      Egress: true
+      CidrBlock: !GetAtt VPC.CidrBlock
+
+  RandaOutboundThoughtSpotRule:
+      Type: AWS::EC2::NetworkAclEntry
+      DependsOn: VPCNetworkAcl
+      Properties:
+        NetworkAclId: !Ref VPCNetworkAcl
+        RuleNumber: 102
+        Protocol: -1
+        RuleAction: allow
+        Egress: true
+        CidrBlock: 10.228.128.0/25
+
+  RandaAllowAllOutboundRuleThoughtSpotCloud:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      NetworkAclId: !Ref VPCNetworkAcl
+      RuleNumber: 103
+      Protocol: -1  # All protocols
+      RuleAction: allow
+      Egress: true
+      CidrBlock: 35.160.44.67/32
+
+
+  RandaSSMInstanceSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: "Enable SSH and HTTP access"
+      GroupName: !Join ['',['SG-',!Ref Environment,"-ssminstancesecuritygroup"]]
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: "tcp"
+          FromPort: 22
+          ToPort: 22
+          CidrIp: "0.0.0.0/0"
+        - IpProtocol: "tcp"
+          FromPort: 80
+          ToPort: 80
+          CidrIp: "0.0.0.0/0"
+      SecurityGroupEgress: 
+        - 
+          CidrIp: "0.0.0.0/0"
+          IpProtocol: "-1"
+      Tags:
+        - Key: Name
+          Value: !Join ['',['SG-',!Ref Environment,"-ssminstancesecuritygroup"]]
+
+
+  RandaInternalSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: "Enable all access across VPC"
+      GroupName: !Join ['',['SG-',!Ref Environment,"-internal-all"]]
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+          - 
+            CidrIp: !GetAtt VPC.CidrBlock
+            IpProtocol: "-1"
+      SecurityGroupEgress: 
+        - 
+          CidrIp: "0.0.0.0/0"
+          IpProtocol: "-1"
+      Tags:
+        - Key: Name
+          Value: !Join ['',['SG-',!Ref Environment,"-internal-all"]]
+
+
+#OUTPUT SECTION, MOSTLY USED FOR EXPORTING KEYS\IDS FOR REFERENCE PURPOSES IN NEW STACKS\LAYERS
+Outputs:
+  ExportPublicSubnetA:
+    Description: PublicSubnetA info
+    Value: !Ref PublicSubnetA
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-ExportPublicSubnetA" ]] 
+  ExportPublicSubnetB:
+    Description: PublicSubnetB info
+    Value: !Ref PublicSubnetB
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-ExportPublicSubnetB" ]] 
+  ExportPublicSubnetC:
+    Description: PublicSubnetC info
+    Value: !Ref PublicSubnetC
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-ExportPublicSubnetC" ]] 
+  ExportSubnetPrivateA1:
+    Description: SubnetPrivateA1 info
+    Value: !Ref SubnetPrivateA1
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-ExportSubnetPrivateA1" ]] 
+  ExportSubnetPrivateA2:
+    Description: SubnetPrivateA2 info
+    Value: !Ref SubnetPrivateA2
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-ExportSubnetPrivateA2" ]] 
+  ExportSubnetPrivateA3:
+    Description: SubnetPrivateA3 info
+    Value: !Ref SubnetPrivateA3
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-ExportSubnetPrivateA3" ]] 
+  ExportSubnetPrivateB1:
+    Description: SubnetPrivateB1 info
+    Value: !Ref SubnetPrivateB1
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-ExportSubnetPrivateB1" ]] 
+  ExportSubnetPrivateB2:
+    Description: SubnetPrivateB2 info
+    Value: !Ref SubnetPrivateB2
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-ExportSubnetPrivateB2" ]]  
+  ExportSubnetPrivateB3:
+    Description: SubnetPrivateB3 info
+    Value: !Ref SubnetPrivateB3
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-ExportSubnetPrivateB3" ]]    
+  ExportSubnetPrivateC1:
+    Description: SubnetPrivateC1 info
+    Value: !Ref SubnetPrivateC1
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-ExportSubnetPrivateC1" ]] 
+  ExportSubnetPrivateC2:
+    Description: SubnetPrivateC2 info
+    Value: !Ref SubnetPrivateC2
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-ExportSubnetPrivateC2" ]]  
+  ExportSubnetPrivateC3:
+    Description: SubnetPrivateC3 info
+    Value: !Ref SubnetPrivateC3
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-ExportSubnetPrivateC3" ]]    
+  ExportSubnetsForDbCluster:
+    Description: List of subnets from level 2 
+    Value: !Join [',', [!Ref SubnetPrivateA2,!Ref SubnetPrivateB2,!Ref SubnetPrivateC2]] 
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-SubnetsForDbCluster" ]]   
+  ExportSubnetsForServices:
+    Description: List of subnets from level 1
+    Value: !Join [',', [!Ref SubnetPrivateA1,!Ref SubnetPrivateB1,!Ref SubnetPrivateC1]] 
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-SubnetsForServices" ]]  
+  
+  #setup for memcache option for REDIS.
+  ExportSubnetsForCache3:
+    Description: List of subnets from level 1 
+    Value: !Join [',', [!Ref SubnetPrivateA1,!Ref SubnetPrivateB1,!Ref SubnetPrivateC1]] 
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-SubnetsForCacheLayer-3" ]]    
+
+  ExportSubnetsForCache:
+    Description: List of subnets from level 1 
+    Value: !Ref SubnetPrivateA1
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-SubnetsForCacheLayer" ]]
+  
+  #InternetGateway
+  ExportInternetGateway:
+    Description: InternetGateway info
+    Value: !Ref InternetGateway
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-InternetGateway" ]]  
+
+  #NatGateway
+  ExportNatGatewayA:
+    Description: NatGatewayA info
+    Value: !Ref NatGatewayA
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-NatGatewayA" ]]  
+
+  #NatGatewayB
+  ExportNatGatewayB:
+    Description: NatGatewayB info
+    Value: !Ref NatGatewayB
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-NatGatewayB" ]]  
+
+
+  #NatGatewayC
+  ExportNatGatewayC:
+    Description: NatGatewayC info
+    Value: !Ref NatGatewayC
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-NatGatewayC" ]]  
+
+
+  #EIP
+  ExportEIPA:
+    Description: Gateway A Elastic IP info
+    Value: !Ref EIPA
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-EIPA" ]]  
+
+  #EIP
+  ExportEIPB:
+    Description: Gateway B Elastic IP info
+    Value: !Ref EIPB
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-EIPB" ]]  
+      
+  #EIPC
+  ExportEIPC:
+    Description: Gateway C Elastic IP info
+    Value: !Ref EIPC
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-EIPC" ]]  
+
+  ExportVPCEndpointS3A:
+     Description: VPCEndpointS3 endpoint for S3 zone A
+     Value: !Ref VPCEndpointS3A
+     Export:
+       Name: !Join ['', [!Ref "Environment", "-VPCEndpointS3A" ]]  
+
+  ExportVPCEndpointS3B:
+     Description: VPCEndpointS3 endpoint for S3 zone B
+     Value: !Ref VPCEndpointS3B
+     Export:
+       Name: !Join ['', [!Ref "Environment", "-VPCEndpointS3B" ]]  
+
+  ExportVPCEndpointS3C:
+     Description: VPCEndpointS3 endpoint for S3 zone C
+     Value: !Ref VPCEndpointS3C
+     Export:
+       Name: !Join ['', [!Ref "Environment", "-VPCEndpointS3C" ]]  
+
+
+
+  ExportVPCEndpointDynamoDbA:
+     Description: VPCEndpointDynamoDb endpoint for DynamoDB zone A
+     Value: !Ref VPCEndpointDynamoDbA
+     Export:
+       Name: !Join ['', [!Ref "Environment", "-VPCEndpointDynamoDbA" ]]  
+
+
+  ExportVPCEndpointDynamoDbBA:
+     Description: VPCEndpointDynamoDb endpoint for DynamoDB zone B
+     Value: !Ref VPCEndpointDynamoDbB
+     Export:
+       Name: !Join ['', [!Ref "Environment", "-VPCEndpointDynamoDbB" ]]  
+
+  
+  ExportVPCEndpointDynamoDbBCA:
+     Description: VPCEndpointDynamoDb endpoint for DynamoDB zone C
+     Value: !Ref VPCEndpointDynamoDbC
+     Export:
+       Name: !Join ['', [!Ref "Environment", "-VPCEndpointDynamoDbC" ]]  
+
+
+  ExportVPCEndpointGlueB:
+      Description: VPCEndpointGlueB endpoint for Glue
+      Value: !Ref VPCEndpointGlueB
+      Export:
+        Name: !Join ['', [!Ref "Environment", "-VPCEndpointGlueB" ]]  
+
+  ExportVPCEndpointEC2:
+       Description: VPCEndpointEC2 endpoint for EC2 instances
+       Value: !Ref VPCEndpointEC2
+       Export:
+         Name: !Join ['', [!Ref "Environment", "-VPCEndpointEC2" ]]  
+
+  #SecurityGroupSSH
+  ExportSecurityGroupSSH:
+    Description: SecurityGroupSSH - ssh security group info
+    Value: !Ref SecurityGroupSSH
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-SecurityGroupSSH" ]]  
+
+  #SecurityGroupHTTPS
+  ExportSecurityGroupHTTPS:
+    Description: SecurityGroupHTTPS - http(s) security group info
+    Value: !Ref SecurityGroupHTTPS
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-SecurityGroupHTTPS" ]]  
+
+  #CacheSecurityGroup
+  ExportCacheSecurityGroup:
+    Description: CacheSecurityGroup - placeholder security group for further use
+    Value: !Ref CacheSecurityGroup
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-CacheSecurityGroup" ]]  
+
+  #CacheStorageSecurityGroup
+  ExportCacheStorageSecurityGroup:
+    Description: CacheStorageSecurityGroup - enable 6379 for ElastiCache cluster communication
+    Value: !Ref CacheStorageSecurityGroup
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-CacheStorageSecurityGroup" ]] 
+
+  #DBSecurityGroup1
+  ExportDBSecurityGroup1:
+    Description: DB cluster security group 1
+    Value: !Ref DBSecurityGroup1
+    Export:
+      Name:  !Join ['', [!Ref "Environment", "-DBSecurityGroup1" ]] 
+
+  #DBSecurityGroup2
+  ExportDBSecurityGroup2:
+    Description: DB cluster security group 2
+    Value: !Ref DBSecurityGroup2
+    Export:
+      Name:  !Join ['', [!Ref "Environment", "-DBSecurityGroup2" ]] 
+
+  #DBSecurityGroup3
+  ExportDBSecurityGroup3:
+    Description: REDSHIFT DB cluster security group 3
+    Value: !Ref DBSecurityGroup3
+    Export:
+      Name:  !Join ['', [!Ref "Environment", "-DBSecurityGroup3" ]] 
+
+  ExportDBRedshiftOnlySecurityGroup3:
+    Description: REDSHIFT DB cluster security group 3
+    Value: !Ref DBRedshiftOnlySecurityGroup3
+    Export:
+      Name:  !Join ['', [!Ref "Environment", "-DBRedshiftOnlySecurityGroup3" ]]
+
+  ExportNLBRedshiftSecurityGroup:
+    Description: NLB security group for REDSHIFT cluster security group 3
+    Value: !Ref NLBRedshiftSecurityGroup
+    Export:
+      Name:  !Join ['', [!Ref "Environment", "-NLBRedshiftSecurityGroup" ]]  
+
+  ExportDBSecurityGroups:
+    Description: List of db security groups
+    Value: !Join [',', [!Ref DBSecurityGroup1,!Ref DBSecurityGroup2]] 
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-DBSecurityGroups" ]]  
+  
+  ExportBucketLogRanda:
+    Description: BucketLogRanda - S3 bucket
+    Value: !Ref BucketLogRanda
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-BucketLogRanda" ]]
+
+  ExportBucketLogRandaArn:
+    Description: BucketLogRanda - S3 bucket
+    Value: !GetAtt BucketLogRanda.Arn 
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-BucketLogRanda-ARN" ]]
+
+  #BucketBackupRanda
+  ExportBucketBackupRanda:
+    Description: BucketBackupRanda - S3 bucket
+    Value: !Ref BucketBackupRanda
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-BucketBackupRanda" ]]  
+  
+  ExportBucketBackupRandaArn:
+    Description: BucketBackupRanda - S3 bucket
+    Value: !GetAtt BucketBackupRanda.Arn 
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-BucketBackupRanda-ARN" ]]  
+
+  #BucketDeploymentsRanda
+  ExportBucketDeploymentsRanda:
+    Description: BucketDeploymentsRanda - S3 bucket
+    Value: !Ref BucketDeploymentsRanda
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-BucketDeploymentsRanda" ]]  
+
+  ExportBucketDeploymentsRandaArn:
+    Description: BucketBackupRanda - S3 bucket
+    Value: !GetAtt BucketDeploymentsRanda.Arn 
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-BucketDeploymentsRanda-ARN" ]]  
+
+  #BucketDocumentStorageRanda
+  ExportBucketDocumentStorageRanda:
+    Description: BucketDocumentStorageRanda - S3 bucket
+    Value: !Ref BucketDocumentStorageRanda
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-BucketDocumentStorageRanda" ]]  
+
+  ExportBucketDocumentStorageRandaArn:
+    Description: BucketDocumentStorageRanda - S3 bucket
+    Value: !GetAtt BucketDocumentStorageRanda.Arn 
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-BucketDocumentStorageRanda-ARN" ]] 
+
+
+
+  #BucketSecureStorageRanda
+  ExportBucketSecureStorageRanda:
+    Description: BucketSecureStorageRanda - S3 bucket
+    Value: !Ref BucketSecureStorageRanda
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-BucketSecureStorageRanda" ]] 
+
+
+  ExportBucketSecureStorageRandaArn:
+    Description: BucketSecureStorageRanda - S3 bucket
+    Value: !GetAtt BucketSecureStorageRanda.Arn 
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-BucketSecureStorageRanda-ARN" ]] 
+
+ #BucketDataWarehouseRanda
+  ExportBucketDataWarehouseRanda:
+      Description: BucketDataWarehouseRanda - S3 bucket
+      Value: !Ref BucketDataWarehouseRanda
+      Export:
+        Name: !Join ['', [!Ref "Environment", "-BucketDataWarehouseRanda" ]] 
+
+
+  ExportRandaRedshiftNLBDNSName:
+      Description: RandaPublicRedshiftNLB - network load balancer dns name for Redshift cluster
+      Value: !GetAtt RandaPublicRedshiftNLB.DNSName 
+      Export:
+        Name: !Join ['', [!Ref "Environment", "-RandaPublicRedshiftNLBDNSName" ]] 
+
+  ExportRandaRedshiftNLBArn:
+      Description: RandaPublicRedshiftNLB - network load balancer ARN name for Redshift cluster
+      Value: !GetAtt RandaPublicRedshiftNLB.LoadBalancerArn 
+      Export:
+        Name: !Join ['', [!Ref "Environment", "-RandaPublicRedshiftNLBArn" ]] 
+
+  ExportRandaVPCPrefixListArn:
+      Description: RandaVPCPrefixList - prefix list name for allowed traffic to this VPC - ARN
+      Value: !GetAtt RandaVPCPrefixList.Arn 
+      Export:
+        Name: !Join ['', [!Ref "Environment", "-RandaVPCPrefixListArn" ]] 
+
+  ExportRandaVPCPrefixListId:
+      Description: RandaVPCPrefixList - prefix list name for allowed traffic to this VPC - ID
+      Value: !GetAtt RandaVPCPrefixList.PrefixListId 
+      Export:
+        Name: !Join ['', [!Ref "Environment", "-RandaVPCPrefixListId" ]] 
+
+  ExportRandaSSMInstanceSecurityGroup:
+    Description: RandaSSMInstanceSecurityGroup - security group for instance profiles
+    Value: !Ref RandaSSMInstanceSecurityGroup
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-RandaSSMInstanceSecurityGroupArn" ]]  
+
+  ExportRandaInternalSecurityGroup:
+    Description: RandaInternalSecurityGroup - security group for all internal traffic
+    Value: !Ref RandaInternalSecurityGroup
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-RandaInternalSecurityGroupArn" ]]  
+
+  ExportRandaDefaultSecurityGroupId:
+    Description: RandaDefaultSecurityGroup - VPC Default Security Group
+    Value: !Ref RandaInternalSecurityGroup
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-RandaInternalSecurityGroupId" ]] 
+
+  ExportVPCEndpointSSM:
+       Description: VPCEndpointSSM endpoint for EC2 instances for SSM
+       Value: !Ref VPCEndpointSSM
+       Export:
+         Name: !Join ['', [!Ref "Environment", "-VPCEndpointSSM" ]] 
+
+  ExportVPCEndpointEC2Messages:
+       Description: VPCEndpointEC2Messages endpoint for EC2 instances for SSM
+       Value: !Ref VPCEndpointEC2Messages
+       Export:
+         Name: !Join ['', [!Ref "Environment", "-VPCEndpointEC2Messages" ]] 
+
+  ExportVPCEndpointSSMMessages:
+       Description: VPCEndpointSSMMessages endpoint for EC2 instances for SSM Messages
+       Value: !Ref VPCEndpointSSMMessages
+       Export:
+         Name: !Join ['', [!Ref "Environment", "-VPCEndpointSSMMessages" ]] 
+  #VPC
+  ExportVPC:
+    Description: The ID of the VPC
+    Value: !Ref VPC
+    Export:
+      Name: !Join ['', [!Ref "Environment", "-VPCID" ]] 
