@@ -1,0 +1,112 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Budget Notification Stack for RANDA-ECOMM
+
+Metadata:
+  Generator: former2 assisted
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    Description: Environment name (e.g., dev, prod)
+    AllowedValues:
+      - dev
+
+  ProductName:
+    Type: String
+    Default: RANDA-ECOMM
+    Description: Product or application name
+    AllowedValues:
+      - RANDA-ECOMM
+
+Resources:
+
+  BudgetAlertsSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: !Sub "${Environment}-raa-ecomm-notifications"
+      TopicName: !Sub "${Environment}-raa-ecomm-notifications"
+      Subscription:
+        - Protocol: email
+          Endpoint: j.jonah511@gmail.com
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Description
+          Value: notifications topic
+        - Key: Name
+          Value: !Sub "${Environment}-raa-ecomm-notifications"
+        - Key: Product
+          Value: !Ref ProductName
+
+  SNSTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics:
+        - !Ref BudgetAlertsSNSTopic
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowBudgetsService
+            Effect: Allow
+            Principal:
+              Service: budgets.amazonaws.com
+            Action:
+              - sns:GetTopicAttributes
+              - sns:Subscribe
+              - sns:ListSubscriptionsByTopic
+              - sns:Publish
+            Resource: !Ref BudgetAlertsSNSTopic
+
+  MonthlyBudget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetName: MonthlyBudget
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit:
+          Amount: 1
+          Unit: USD
+      NotificationsWithSubscribers:
+        - Notification:
+            NotificationType: ACTUAL
+            ThresholdType: PERCENTAGE
+            Threshold: 75
+            ComparisonOperator: GREATER_THAN
+          Subscribers:
+            - SubscriptionType: SNS
+              Address: !Ref BudgetAlertsSNSTopic
+
+  DailyBudget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetName: DailyBudget
+        BudgetType: COST
+        TimeUnit: DAILY
+        BudgetLimit:
+          Amount: 0.25
+          Unit: USD
+      NotificationsWithSubscribers:
+        - Notification:
+            NotificationType: ACTUAL
+            ThresholdType: PERCENTAGE
+            Threshold: 75
+            ComparisonOperator: GREATER_THAN
+          Subscribers:
+            - SubscriptionType: SNS
+              Address: !Ref BudgetAlertsSNSTopic
+
+Outputs:
+  BudgetAlertsTopicArn:
+    Description: Budget alerts SNS topic ARN
+    Value: !GetAtt BudgetAlertsSNSTopic.TopicArn
+    Export:
+      Name: !Sub "${Environment}-BudgetAlertsTopicArn"
+
+  BudgetAlertsTopicName:
+    Description: Budget alerts SNS topic name
+    Value: !GetAtt BudgetAlertsSNSTopic.TopicName
+    Export:
+      Name: !Sub "${Environment}-BudgetAlertsSNSTopicName"

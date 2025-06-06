@@ -1,0 +1,44 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Creates Daily and Monthly Budgets with Email Alerts
+
+Resources:
+
+  MonthlyBudget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetLimit:
+          Amount: 1000
+          Unit: USD
+        BudgetName: MyMonthlyBudget
+        BudgetType: COST
+        TimeUnit: MONTHLY
+      NotificationsWithSubscribers:
+        - Notification:
+            NotificationType: ACTUAL
+            ThresholdType: PERCENTAGE
+            Threshold: 75
+            ComparisonOperator: GREATER_THAN
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: myfirstawsalerats@gmail.com
+
+  DailyBudget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetLimit:
+          Amount: 50
+          Unit: USD
+        BudgetName: MyDailyBudget
+        BudgetType: COST
+        TimeUnit: DAILY
+      NotificationsWithSubscribers:
+        - Notification:
+            NotificationType: ACTUAL
+            ThresholdType: PERCENTAGE
+            Threshold: 75
+            ComparisonOperator: GREATER_THAN
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: myfirstawsalerats@gmail.com

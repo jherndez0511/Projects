@@ -1,0 +1,52 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS Budgets for Daily and Monthly Costs with SNS Email Alerts
+
+Resources:
+
+  BudgetSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: BudgetAlertsTopic
+      Subscription:
+        - Protocol: email
+          Endpoint: myfirstawsalerats@gmail.com
+
+  MonthlyBudget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetName: "MyMonthlyBudget"
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit:
+          Amount: 1.00
+          Unit: USD
+      NotificationsWithSubscribers:
+        - Notification:
+            NotificationType: ACTUAL
+            ThresholdType: PERCENTAGE
+            Threshold: 75
+            ComparisonOperator: GREATER_THAN
+          Subscribers:
+            - SubscriptionType: SNS
+              Address: !Ref BudgetSNSTopic
+
+  DailyBudget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetName: "MyDailyBudget"
+        BudgetType: COST
+        TimeUnit: DAILY
+        BudgetLimit:
+          Amount: 0.50
+          Unit: USD
+      NotificationsWithSubscribers:
+        - Notification:
+            NotificationType: ACTUAL
+            ThresholdType: PERCENTAGE
+            Threshold: 75
+            ComparisonOperator: GREATER_THAN
+          Subscribers:
+            - SubscriptionType: SNS
+              Address: !Ref BudgetSNSTopic
