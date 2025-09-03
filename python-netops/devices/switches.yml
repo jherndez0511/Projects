@@ -1,9 +1,0 @@
-cisco_ios:
-  hosts:
-    odc1-core-9500: { host: 10.110.1.10 }
-    odc2-dist-9300: { host: 10.100.2.20 }
-  vars:
-    device_type: cisco_ios
-    username: ${CISCO_USER}
-    password: ${CISCO_PASS}
-    fast_cli: true
